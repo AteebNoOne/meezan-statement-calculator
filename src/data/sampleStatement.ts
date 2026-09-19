@@ -162,12 +162,12 @@ export function calculateSummary(entries: StatementEntry[]): StatementSummary {
       debitCount += 1;
     }
 
-    if (isRemittanceEntry(entry)) {
+    if (entry.type === 'credit' && isRemittanceEntry(entry)) {
       remittanceTotal += entry.amount || 0;
       remittanceCount += 1;
     }
 
-    if (isTaptapRemittanceEntry(entry)) {
+    if (entry.type === 'credit' && isTaptapRemittanceEntry(entry)) {
       remittanceFromTaptapTotal += entry.amount || 0;
       remittanceFromTaptapCount += 1;
     }

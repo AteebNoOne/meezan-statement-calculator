@@ -1,8 +1,9 @@
 import React, { useRef, useState } from 'react';
-import { Upload, FileText, Sparkles, AlertCircle, RefreshCw } from 'lucide-react';
+import { Upload, FileText, Sparkles, AlertCircle, RefreshCw, Lock, ShieldCheck } from 'lucide-react';
+import { PinModal } from './PinModal';
 
 interface FileUploadAreaProps {
-  onFileSelected: (file: File, forceAi?: boolean) => void;
+  onFileSelected: (file: File, forceAi?: boolean, pinToken?: string) => void;
   isLoading: boolean;
   loadingMessage: string;
   errorMessage: string | null;
@@ -20,6 +21,8 @@ export function FileUploadArea({
 }: FileUploadAreaProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [forceAi, setForceAi] = useState(false);
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+  const [pinToken, setPinToken] = useState<string | undefined>(undefined);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -37,17 +40,32 @@ export function FileUploadArea({
     setIsDragOver(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const file = e.dataTransfer.files[0];
-      onFileSelected(file, forceAi);
+      onFileSelected(file, forceAi, pinToken);
     }
   };
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
-      onFileSelected(file, forceAi);
+      onFileSelected(file, forceAi, pinToken);
       // Reset input value so re-selecting same file triggers change
       e.target.value = '';
     }
+  };
+
+  const handleToggleAi = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.checked) {
+      setIsPinModalOpen(true);
+    } else {
+      setForceAi(false);
+      setPinToken(undefined);
+    }
+  };
+
+  const handlePinSuccess = (token?: string) => {
+    setForceAi(true);
+    setPinToken(token);
+    setIsPinModalOpen(false);
   };
 
   return (
@@ -113,20 +131,30 @@ export function FileUploadArea({
 
       {/* Quick Helper Actions & Options */}
       <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
-        <div className="flex items-center gap-3">
-          <label className="inline-flex items-center gap-1.5 cursor-pointer text-slate-600 select-none">
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="inline-flex items-center gap-2 cursor-pointer text-slate-700 select-none">
             <input
               type="checkbox"
               id="toggle-force-ai"
               checked={forceAi}
-              onChange={(e) => setForceAi(e.target.checked)}
-              className="rounded border-slate-300 text-[#581c53] focus:ring-[#581c53] w-3.5 h-3.5"
+              onChange={handleToggleAi}
+              className="rounded border-slate-300 text-[#581c53] focus:ring-[#581c53] w-4 h-4 cursor-pointer"
             />
-            <span className="flex items-center gap-1">
+            <span className="flex items-center gap-1.5 font-medium text-slate-800">
               <Sparkles className="w-3.5 h-3.5 text-amber-600" />
               Use AI OCR (Recommended for photos / camera scans)
             </span>
           </label>
+
+          {forceAi ? (
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full shadow-2xs">
+              <ShieldCheck className="w-3 h-3 text-emerald-600" /> PIN Verified
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
+              <Lock className="w-2.5 h-2.5 text-slate-400" /> PIN Protected
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
@@ -142,6 +170,13 @@ export function FileUploadArea({
           )}
         </div>
       </div>
+
+      {/* PIN Verification Modal */}
+      <PinModal
+        isOpen={isPinModalOpen}
+        onClose={() => setIsPinModalOpen(false)}
+        onSuccess={handlePinSuccess}
+      />
 
       {/* Error alert if any */}
       {errorMessage && (

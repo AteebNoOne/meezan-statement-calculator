@@ -20,7 +20,7 @@ interface RawTextItem {
 /**
  * Extracts transactions directly from a digital PDF using coordinate and regex analysis.
  */
-export async function parseMeezanPdf(file: File): Promise<ParsedStatementResult> {
+export async function parseMeezanPdf(file: File, pinToken?: string): Promise<ParsedStatementResult> {
   const arrayBuffer = await file.arrayBuffer();
   const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
   const pdf = await loadingTask.promise;
@@ -32,18 +32,12 @@ export async function parseMeezanPdf(file: File): Promise<ParsedStatementResult>
   for (let pageNum = 1; pageNum <= numPages; pageNum++) {
     const page = await pdf.getPage(pageNum);
     const textContent = await page.getTextContent();
-    const items = textContent.items as any[];
-    totalTextItemsCount += items.length;
+    totalTextItemsCount += textContent.items.length;
 
-    if (items.length === 0) {
-      continue;
-    }
-
-    // Convert to structured items with coordinates
-    const textItems: RawTextItem[] = items
-      .filter((item) => item.str && item.str.trim().length > 0)
-      .map((item) => ({
-        str: item.str.trim(),
+    const textItems: RawTextItem[] = textContent.items
+      .filter((item: any) => item && typeof item.str === 'string')
+      .map((item: any) => ({
+        str: item.str,
         x: item.transform[4],
         y: item.transform[5],
         width: item.width || 0,
@@ -54,17 +48,14 @@ export async function parseMeezanPdf(file: File): Promise<ParsedStatementResult>
     allEntries.push(...pageEntries);
   }
 
-  // If digital text extraction didn't yield transactions, fallback to AI parsing
+  // If digital text extraction didn't yield transactions, check if AI is authorized
   if (allEntries.length === 0) {
-    if (totalTextItemsCount < 20) {
-      // Scanned document or image-only PDF
-      return parseViaAiServer(file);
+    if (pinToken) {
+      return parseViaAiServer(file, pinToken);
     }
-  }
-
-  // If still empty after text extraction, fallback to AI server
-  if (allEntries.length === 0) {
-    return parseViaAiServer(file);
+    throw new Error(
+      'No digital text transactions found in this document. If this is a scanned document or camera photo, please enable "Use AI OCR" (requires security PIN).'
+    );
   }
 
   return {
@@ -226,20 +217,34 @@ export function fileToBase64(file: File): Promise<string> {
 /**
  * Parse via backend AI service for scanned PDF or image statements
  */
-export async function parseViaAiServer(file: File): Promise<ParsedStatementResult> {
+export async function parseViaAiServer(file: File, pinToken?: string): Promise<ParsedStatementResult> {
   const base64 = await fileToBase64(file);
   const mimeType = file.type || (file.name.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg');
 
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (pinToken) {
+    headers['X-AI-PIN-Token'] = pinToken;
+  }
+
   const res = await fetch('/api/parse-statement', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({
       fileBase64: base64,
       mimeType: mimeType,
+      pinToken: pinToken,
     }),
   });
 
   if (!res.ok) {
+    if (res.status === 404) {
+      throw new Error(
+        'AI OCR server endpoint (/api/parse-statement) returned 404 Not Found. Please ensure your backend server (server.ts / npm run dev / dist/server.cjs) is running and your web server reverse-proxy forwards /api/* requests to it.'
+      );
+    }
+    if (res.status === 401 || res.status === 403) {
+      throw new Error('Unauthorized: Security PIN verification required to use AI OCR.');
+    }
     const errData = await res.json().catch(() => ({}));
     throw new Error(errData.error || `Server returned error ${res.status}`);
   }

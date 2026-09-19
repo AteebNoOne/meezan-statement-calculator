@@ -15,7 +15,7 @@ export default function App() {
   const [loadingMessage, setLoadingMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const handleFileSelected = async (file: File, forceAi = false) => {
+  const handleFileSelected = async (file: File, forceAi = false, pinToken?: string) => {
     setIsLoading(true);
     setErrorMessage(null);
 
@@ -24,20 +24,20 @@ export default function App() {
     try {
       if (!forceAi && isPdf) {
         setLoadingMessage('Processing PDF pages and reading transaction tables...');
-        const result = await parseMeezanPdf(file);
+        const result = await parseMeezanPdf(file, pinToken);
         setStatementData(result);
       } else {
         setLoadingMessage('Scanning statement with AI recognition...');
-        const result = await parseViaAiServer(file);
+        const result = await parseViaAiServer(file, pinToken);
         setStatementData(result);
       }
     } catch (err: any) {
       console.error('File parsing error:', err);
-      // If client-side failed, attempt AI fallback if not tried yet
-      if (!forceAi) {
+      // If client-side failed and user had pinToken, attempt AI fallback
+      if (!forceAi && pinToken) {
         try {
           setLoadingMessage('Retrying with AI Enhanced Scanner...');
-          const aiResult = await parseViaAiServer(file);
+          const aiResult = await parseViaAiServer(file, pinToken);
           setStatementData(aiResult);
           return;
         } catch (aiErr: any) {
@@ -45,7 +45,7 @@ export default function App() {
           setErrorMessage(aiErr?.message || err?.message || 'Failed to extract statement data. Please ensure it is a valid Meezan statement.');
         }
       } else {
-        setErrorMessage(err?.message || 'Failed to extract statement data via AI.');
+        setErrorMessage(err?.message || 'Failed to extract statement data.');
       }
     } finally {
       setIsLoading(false);

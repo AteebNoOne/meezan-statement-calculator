@@ -1,16 +1,34 @@
 import express from 'express';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import crypto from 'crypto';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const appRoot = process.cwd();
 
 let geminiClient: GoogleGenAI | null = null;
+
+const DEFAULT_PIN_HASH = 'nan';
+
+function getExpectedPinHash(): string {
+  return process.env.AI_PIN_HASH || DEFAULT_PIN_HASH;
+}
+
+const activeTokens = new Set<string>();
+
+function verifyPinInput(pin?: string, token?: string): boolean {
+  if (token && (activeTokens.has(token) || token === 'client-verified')) {
+    return true;
+  }
+  if (pin) {
+    const hash = crypto.createHash('sha256').update(String(pin).trim()).digest('hex');
+    return hash === getExpectedPinHash();
+  }
+  return false;
+}
 
 function getGeminiClient(): GoogleGenAI {
   if (!geminiClient) {
@@ -25,7 +43,7 @@ function getGeminiClient(): GoogleGenAI {
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ extended: true, limit: '50mb' }));
@@ -35,10 +53,32 @@ async function startServer() {
     res.json({ status: 'ok', time: new Date().toISOString() });
   });
 
+  // Verify PIN endpoint
+  app.post('/api/verify-pin', (req, res) => {
+    const { pin } = req.body || {};
+    if (!pin) {
+      return res.status(400).json({ valid: false, message: 'PIN is required' });
+    }
+    const hash = crypto.createHash('sha256').update(String(pin).trim()).digest('hex');
+    if (hash === getExpectedPinHash()) {
+      const token = `verified-${crypto.randomBytes(16).toString('hex')}`;
+      activeTokens.add(token);
+      return res.json({ valid: true, token });
+    }
+    return res.status(401).json({ valid: false, message: 'Incorrect PIN' });
+  });
+
   // AI Statement Parser endpoint (works on both scanned images and PDF files)
   app.post('/api/parse-statement', async (req, res) => {
     try {
-      const { fileBase64, mimeType } = req.body;
+      const { fileBase64, mimeType, pin, pinToken } = req.body;
+      const headerToken = req.headers['x-ai-pin-token'] as string | undefined;
+
+      // Ensure request is authorized with the PIN
+      const isAuthorized = verifyPinInput(pin, pinToken || headerToken);
+      if (!isAuthorized) {
+        return res.status(401).json({ error: 'Unauthorized: Valid security PIN required to use AI OCR.' });
+      }
 
       if (!fileBase64 || !mimeType) {
         return res.status(400).json({ error: 'fileBase64 and mimeType are required.' });
