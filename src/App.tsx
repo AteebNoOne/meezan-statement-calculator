@@ -4,12 +4,12 @@ import { FileUploadArea } from './components/FileUploadArea';
 import { StatementSummaryCards } from './components/StatementSummaryCards';
 import { StatementTable } from './components/StatementTable';
 import { ParsedStatementResult, StatementEntry } from './types';
-import { SAMPLE_STATEMENT_RESULT, calculateSummary } from './data/sampleStatement';
+import { calculateSummary } from './data/sampleStatement';
 import { parseMeezanPdf, parseViaAiServer } from './utils/pdfParser';
-import { FileCheck, Sparkles } from 'lucide-react';
+import { FileCheck } from 'lucide-react';
 
 export default function App() {
-  const [statementData, setStatementData] = useState<ParsedStatementResult | null>(SAMPLE_STATEMENT_RESULT);
+  const [statementData, setStatementData] = useState<ParsedStatementResult | null>(null);
   const [currentFilter, setCurrentFilter] = useState<'all' | 'credit' | 'debit'>('all');
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
@@ -50,11 +50,6 @@ export default function App() {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleLoadSample = () => {
-    setStatementData(SAMPLE_STATEMENT_RESULT);
-    setErrorMessage(null);
   };
 
   const handleReset = () => {
@@ -146,7 +141,6 @@ export default function App() {
         <section aria-label="Statement Upload">
           <FileUploadArea
             onFileSelected={handleFileSelected}
-            onLoadSample={handleLoadSample}
             isLoading={isLoading}
             loadingMessage={loadingMessage}
             errorMessage={errorMessage}
@@ -163,11 +157,6 @@ export default function App() {
               <span className="font-semibold text-slate-800">{statementData.fileName}</span>
               {statementData.pageCount > 0 && (
                 <span className="text-slate-400">&bull; {statementData.pageCount} page(s)</span>
-              )}
-              {statementData.fileName === SAMPLE_STATEMENT_RESULT.fileName && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-purple-100 text-[#581c53]">
-                  <Sparkles className="w-2.5 h-2.5" /> Sample Loaded
-                </span>
               )}
             </div>
             <div className="text-slate-500">

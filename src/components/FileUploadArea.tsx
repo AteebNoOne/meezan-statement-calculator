@@ -1,9 +1,8 @@
 import React, { useRef, useState } from 'react';
-import { Upload, FileText, Sparkles, AlertCircle, RefreshCw, Eye } from 'lucide-react';
+import { Upload, FileText, Sparkles, AlertCircle, RefreshCw } from 'lucide-react';
 
 interface FileUploadAreaProps {
   onFileSelected: (file: File, forceAi?: boolean) => void;
-  onLoadSample: () => void;
   isLoading: boolean;
   loadingMessage: string;
   errorMessage: string | null;
@@ -13,7 +12,6 @@ interface FileUploadAreaProps {
 
 export function FileUploadArea({
   onFileSelected,
-  onLoadSample,
   isLoading,
   loadingMessage,
   errorMessage,
@@ -132,19 +130,6 @@ export function FileUploadArea({
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            id="load-sample-btn"
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onLoadSample();
-            }}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 font-medium text-[#581c53] bg-purple-50 hover:bg-purple-100/80 border border-purple-200 rounded-lg transition-colors cursor-pointer"
-          >
-            <Eye className="w-3.5 h-3.5" />
-            Load Sample Statement
-          </button>
-
           {activeFileName && (
             <button
               id="reset-statement-btn"
@@ -166,7 +151,7 @@ export function FileUploadArea({
             <span className="font-semibold">Unable to process document: </span>
             {errorMessage}
             <div className="mt-1 text-[11px] text-rose-700">
-              Try clicking "Use AI OCR" above, or load the sample statement to inspect the format.
+              Try uploading a clearer PDF or enable AI OCR for better extraction.
             </div>
           </div>
         </div>
