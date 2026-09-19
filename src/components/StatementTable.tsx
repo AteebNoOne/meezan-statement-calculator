@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { StatementEntry } from '../types';
+import { StatementEntry, StatementFilter } from '../types';
+import { isRemittanceEntry, isTaptapRemittanceEntry } from '../data/sampleStatement';
 import { Search, Plus, Trash2, Edit2, Check, X, Download, ArrowUpDown } from 'lucide-react';
 
 interface StatementTableProps {
   entries: StatementEntry[];
-  currentFilter: 'all' | 'credit' | 'debit';
-  onFilterChange: (filter: 'all' | 'credit' | 'debit') => void;
+  currentFilter: StatementFilter;
+  onFilterChange: (filter: StatementFilter) => void;
   onUpdateEntry: (updated: StatementEntry) => void;
   onDeleteEntry: (id: string) => void;
   onAddEntry: (newEntry: StatementEntry) => void;
@@ -44,6 +45,8 @@ export function StatementTable({
   const filteredEntries = entries.filter((entry) => {
     if (currentFilter === 'credit' && entry.type !== 'credit') return false;
     if (currentFilter === 'debit' && entry.type !== 'debit') return false;
+    if (currentFilter === 'remittance' && !isRemittanceEntry(entry)) return false;
+    if (currentFilter === 'taptap' && !isTaptapRemittanceEntry(entry)) return false;
     if (searchTerm.trim()) {
       const q = searchTerm.toLowerCase();
       return (
@@ -112,11 +115,11 @@ export function StatementTable({
       {/* Controls Bar */}
       <div className="p-4 border-b border-slate-200 bg-slate-50/50 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <div className="inline-flex rounded-lg bg-slate-200/80 p-0.5 text-xs font-medium">
+          <div className="inline-flex flex-wrap rounded-lg bg-slate-200/80 p-0.5 text-xs font-medium gap-0.5">
             <button
               id="filter-all-btn"
               onClick={() => onFilterChange('all')}
-              className={`px-3 py-1.5 rounded-md transition-all cursor-pointer ${
+              className={`px-2.5 py-1.5 rounded-md transition-all cursor-pointer ${
                 currentFilter === 'all'
                   ? 'bg-white text-slate-900 shadow-xs font-semibold'
                   : 'text-slate-600 hover:text-slate-900'
@@ -127,7 +130,7 @@ export function StatementTable({
             <button
               id="filter-credits-btn"
               onClick={() => onFilterChange('credit')}
-              className={`px-3 py-1.5 rounded-md transition-all cursor-pointer ${
+              className={`px-2.5 py-1.5 rounded-md transition-all cursor-pointer ${
                 currentFilter === 'credit'
                   ? 'bg-emerald-600 text-white shadow-xs font-semibold'
                   : 'text-emerald-700 hover:text-emerald-900'
@@ -138,13 +141,35 @@ export function StatementTable({
             <button
               id="filter-debits-btn"
               onClick={() => onFilterChange('debit')}
-              className={`px-3 py-1.5 rounded-md transition-all cursor-pointer ${
+              className={`px-2.5 py-1.5 rounded-md transition-all cursor-pointer ${
                 currentFilter === 'debit'
                   ? 'bg-rose-600 text-white shadow-xs font-semibold'
                   : 'text-rose-700 hover:text-rose-900'
               }`}
             >
               Debits Only (-)
+            </button>
+            <button
+              id="filter-remittance-btn"
+              onClick={() => onFilterChange('remittance')}
+              className={`px-2.5 py-1.5 rounded-md transition-all cursor-pointer ${
+                currentFilter === 'remittance'
+                  ? 'bg-sky-600 text-white shadow-xs font-semibold'
+                  : 'text-sky-700 hover:text-sky-900'
+              }`}
+            >
+              Remittance (+)
+            </button>
+            <button
+              id="filter-taptap-btn"
+              onClick={() => onFilterChange('taptap')}
+              className={`px-2.5 py-1.5 rounded-md transition-all cursor-pointer ${
+                currentFilter === 'taptap'
+                  ? 'bg-amber-600 text-white shadow-xs font-semibold'
+                  : 'text-amber-700 hover:text-amber-900'
+              }`}
+            >
+              Taptap (+)
             </button>
           </div>
         </div>

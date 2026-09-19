@@ -33,3 +33,5 @@ export interface ParsedStatementResult {
   summary: StatementSummary;
   parsedAt: string;
 }
+
+export type StatementFilter = 'all' | 'credit' | 'debit' | 'remittance' | 'taptap';

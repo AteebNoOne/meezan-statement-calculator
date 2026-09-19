@@ -1,12 +1,12 @@
-import { StatementSummary } from '../types';
+import { StatementSummary, StatementFilter } from '../types';
 import { TrendingUp, TrendingDown, DollarSign, ListFilter, Copy, Check, ArrowLeftRight } from 'lucide-react';
 import { useState } from 'react';
 import taptapIcon from '../data/taptap.png';
 
 interface SummaryCardsProps {
   summary: StatementSummary;
-  onFilterChange: (filter: 'all' | 'credit' | 'debit') => void;
-  currentFilter: 'all' | 'credit' | 'debit';
+  onFilterChange: (filter: StatementFilter) => void;
+  currentFilter: StatementFilter;
 }
 
 export function StatementSummaryCards({
@@ -138,7 +138,12 @@ Total Entries: ${summary.totalTransactions} (${summary.creditCount} Credits, ${s
         {/* Remittance Total Card - Inward Credit Remittances */}
         <div
           id="card-remittance-total"
-          className="relative p-4 rounded-xl bg-gradient-to-b from-white to-sky-50/30 border border-sky-200 shadow-xs hover:shadow-md hover:shadow-sky-500/10 hover:-translate-y-0.5 transition-all duration-200"
+          onClick={() => onFilterChange(currentFilter === 'remittance' ? 'all' : 'remittance')}
+          className={`relative p-4 rounded-xl border transition-all duration-200 cursor-pointer ${
+            currentFilter === 'remittance'
+              ? 'bg-gradient-to-b from-sky-50 to-sky-100/60 border-sky-500 shadow-md ring-2 ring-sky-400/30 -translate-y-0.5'
+              : 'bg-gradient-to-b from-white to-sky-50/20 border-sky-200/90 hover:border-sky-400 shadow-xs hover:shadow-md hover:shadow-sky-500/10 hover:-translate-y-0.5'
+          }`}
         >
           <div className="flex items-center justify-between mb-2">
             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-sky-100 text-sky-800 shadow-xs">
@@ -160,12 +165,22 @@ Total Entries: ${summary.totalTransactions} (${summary.creditCount} Credits, ${s
               Credit (+) transfers & remittances
             </p>
           </div>
+          {currentFilter === 'remittance' && (
+            <div className="mt-2 pt-2 border-t border-sky-200 text-[11px] font-medium text-sky-800">
+              Filtering table: Showing Remittances only
+            </div>
+          )}
         </div>
 
         {/* Taptap Remittance Card - Inward Credit Taptap Remittances */}
         <div
           id="card-remittance-taptap"
-          className="relative p-4 rounded-xl bg-gradient-to-b from-white to-amber-50/30 border border-amber-200 shadow-xs hover:shadow-md hover:shadow-amber-500/10 hover:-translate-y-0.5 transition-all duration-200"
+          onClick={() => onFilterChange(currentFilter === 'taptap' ? 'all' : 'taptap')}
+          className={`relative p-4 rounded-xl border transition-all duration-200 cursor-pointer ${
+            currentFilter === 'taptap'
+              ? 'bg-gradient-to-b from-amber-50 to-amber-100/60 border-amber-500 shadow-md ring-2 ring-amber-400/30 -translate-y-0.5'
+              : 'bg-gradient-to-b from-white to-amber-50/20 border-amber-200/90 hover:border-amber-400 shadow-xs hover:shadow-md hover:shadow-amber-500/10 hover:-translate-y-0.5'
+          }`}
         >
           <div className="flex items-center justify-between mb-2 gap-2">
             <div className="flex items-center gap-1.5 min-w-0">
@@ -194,6 +209,11 @@ Total Entries: ${summary.totalTransactions} (${summary.creditCount} Credits, ${s
               Received via TapTap Send (+)
             </p>
           </div>
+          {currentFilter === 'taptap' && (
+            <div className="mt-2 pt-2 border-t border-amber-200 text-[11px] font-medium text-amber-800">
+              Filtering table: Showing TapTap only
+            </div>
+          )}
         </div>
 
         {/* Net Flow Card */}

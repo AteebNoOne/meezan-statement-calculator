@@ -3,14 +3,14 @@ import { MeezanHeader } from './components/MeezanHeader';
 import { FileUploadArea } from './components/FileUploadArea';
 import { StatementSummaryCards } from './components/StatementSummaryCards';
 import { StatementTable } from './components/StatementTable';
-import { ParsedStatementResult, StatementEntry } from './types';
+import { ParsedStatementResult, StatementEntry, StatementFilter } from './types';
 import { calculateSummary } from './data/sampleStatement';
 import { parseMeezanPdf, parseViaAiServer } from './utils/pdfParser';
 import { FileCheck } from 'lucide-react';
 
 export default function App() {
   const [statementData, setStatementData] = useState<ParsedStatementResult | null>(null);
-  const [currentFilter, setCurrentFilter] = useState<'all' | 'credit' | 'debit'>('all');
+  const [currentFilter, setCurrentFilter] = useState<StatementFilter>('all');
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);

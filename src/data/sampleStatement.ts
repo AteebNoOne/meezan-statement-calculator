@@ -122,25 +122,68 @@ export const SAMPLE_ENTRIES: StatementEntry[] = [
     availableBalance: 1035.55,
     pageNumber: 1,
   },
+  {
+    id: 'sample-12',
+    bookingDate: '24 Jan 2026',
+    description: 'Remittance From TAPTAP SEND UK-PAYABLE ACCOUNT NBP XXXX4253027386 STAN(636148)',
+    type: 'credit',
+    amount: 15000.00,
+    credit: 15000.00,
+    debit: null,
+    availableBalance: 16035.55,
+    pageNumber: 1,
+  },
+  {
+    id: 'sample-13',
+    bookingDate: '25 Jan 2026',
+    description: 'Remittance From SHEHROZ KHAN WAHID KHAN FAYSAL XXXXZ030027965 STAN(547871)',
+    type: 'credit',
+    amount: 38875.00,
+    credit: 38875.00,
+    debit: null,
+    availableBalance: 54910.55,
+    pageNumber: 1,
+  },
 ];
 
-function isRemittanceEntry(entry: StatementEntry): boolean {
-  const description = entry.description.toLowerCase();
+export function isTaptapRemittanceEntry(entry: StatementEntry): boolean {
+  if (entry.type !== 'credit') return false;
+  const desc = (entry.description || '').toLowerCase();
+  const normalized = desc.replace(/[\s\-_.]+/g, '');
   return (
-    description.includes('raast') ||
-    description.includes('fund transfer') ||
-    description.includes('p2p') ||
-    description.includes('remittance') ||
-    description.includes('money received') ||
-    description.includes('transfer') ||
-    description.includes('taptap') ||
-    description.includes('send uk')
+    normalized.includes('taptap') ||
+    desc.includes('tap tap') ||
+    desc.includes('send uk') ||
+    desc.includes('taptap send')
   );
 }
 
-function isTaptapRemittanceEntry(entry: StatementEntry): boolean {
-  const description = entry.description.toLowerCase();
-  return description.includes('taptap');
+export function isRemittanceEntry(entry: StatementEntry): boolean {
+  if (entry.type !== 'credit') return false;
+  const desc = (entry.description || '').toLowerCase();
+
+  // 1. Taptap remittance is always a remittance
+  if (isTaptapRemittanceEntry(entry)) {
+    return true;
+  }
+
+  // 2. Explicit foreign remittance keywords & PRI channels
+  // Domestic transfers like "Raast P2P", "Fund transfer", "Money Received" are NOT foreign remittances
+  return (
+    desc.includes('remittance') ||
+    desc.includes('home remit') ||
+    desc.includes('inward remit') ||
+    desc.includes('foreign remit') ||
+    desc.includes('western union') ||
+    desc.includes('moneygram') ||
+    desc.includes('remitly') ||
+    desc.includes('worldremit') ||
+    desc.includes('ria ') ||
+    desc.includes('ria remittance') ||
+    desc.includes('ace money') ||
+    desc.includes(' pri ') ||
+    desc.startsWith('pri ')
+  );
 }
 
 export function calculateSummary(entries: StatementEntry[]): StatementSummary {
@@ -162,12 +205,12 @@ export function calculateSummary(entries: StatementEntry[]): StatementSummary {
       debitCount += 1;
     }
 
-    if (entry.type === 'credit' && isRemittanceEntry(entry)) {
+    if (isRemittanceEntry(entry)) {
       remittanceTotal += entry.amount || 0;
       remittanceCount += 1;
     }
 
-    if (entry.type === 'credit' && isTaptapRemittanceEntry(entry)) {
+    if (isTaptapRemittanceEntry(entry)) {
       remittanceFromTaptapTotal += entry.amount || 0;
       remittanceFromTaptapCount += 1;
     }
