@@ -124,11 +124,34 @@ export const SAMPLE_ENTRIES: StatementEntry[] = [
   },
 ];
 
+function isRemittanceEntry(entry: StatementEntry): boolean {
+  const description = entry.description.toLowerCase();
+  return (
+    description.includes('raast') ||
+    description.includes('fund transfer') ||
+    description.includes('p2p') ||
+    description.includes('remittance') ||
+    description.includes('money received') ||
+    description.includes('transfer') ||
+    description.includes('taptap') ||
+    description.includes('send uk')
+  );
+}
+
+function isTaptapRemittanceEntry(entry: StatementEntry): boolean {
+  const description = entry.description.toLowerCase();
+  return description.includes('taptap');
+}
+
 export function calculateSummary(entries: StatementEntry[]): StatementSummary {
   let totalCredit = 0;
   let creditCount = 0;
   let totalDebit = 0;
   let debitCount = 0;
+  let remittanceTotal = 0;
+  let remittanceCount = 0;
+  let remittanceFromTaptapTotal = 0;
+  let remittanceFromTaptapCount = 0;
 
   for (const entry of entries) {
     if (entry.type === 'credit') {
@@ -138,6 +161,16 @@ export function calculateSummary(entries: StatementEntry[]): StatementSummary {
       totalDebit += entry.amount || 0;
       debitCount += 1;
     }
+
+    if (isRemittanceEntry(entry)) {
+      remittanceTotal += entry.amount || 0;
+      remittanceCount += 1;
+    }
+
+    if (isTaptapRemittanceEntry(entry)) {
+      remittanceFromTaptapTotal += entry.amount || 0;
+      remittanceFromTaptapCount += 1;
+    }
   }
 
   return {
@@ -145,6 +178,10 @@ export function calculateSummary(entries: StatementEntry[]): StatementSummary {
     creditCount,
     totalDebit: Math.round(totalDebit * 100) / 100,
     debitCount,
+    remittanceTotal: Math.round(remittanceTotal * 100) / 100,
+    remittanceCount,
+    remittanceFromTaptapTotal: Math.round(remittanceFromTaptapTotal * 100) / 100,
+    remittanceFromTaptapCount,
     netFlow: Math.round((totalCredit - totalDebit) * 100) / 100,
     totalTransactions: entries.length,
   };

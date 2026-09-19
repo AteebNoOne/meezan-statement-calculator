@@ -15,6 +15,10 @@ export interface StatementSummary {
   creditCount: number;
   totalDebit: number;
   debitCount: number;
+  remittanceTotal: number;
+  remittanceCount: number;
+  remittanceFromTaptapTotal: number;
+  remittanceFromTaptapCount: number;
   netFlow: number;
   totalTransactions: number;
 }

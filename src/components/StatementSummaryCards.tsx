@@ -1,6 +1,7 @@
 import { StatementSummary } from '../types';
-import { TrendingUp, TrendingDown, DollarSign, ListFilter, Copy, Check } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, ListFilter, Copy, Check, ArrowLeftRight } from 'lucide-react';
 import { useState } from 'react';
+import taptapIcon from '../data/taptap.png';
 
 interface SummaryCardsProps {
   summary: StatementSummary;
@@ -27,6 +28,8 @@ export function StatementSummaryCards({
 -------------------------
 Total Credits (+): + PKR ${formatPKR(summary.totalCredit)} (${summary.creditCount} entries)
 Total Debits (-): - PKR ${formatPKR(summary.totalDebit)} (${summary.debitCount} entries)
+Remittance Total: PKR ${formatPKR(summary.remittanceTotal)} (${summary.remittanceCount} entries)
+Taptap Remittance: PKR ${formatPKR(summary.remittanceFromTaptapTotal)} (${summary.remittanceFromTaptapCount} entries)
 Net Difference: ${summary.netFlow >= 0 ? '+' : '-'} PKR ${formatPKR(summary.netFlow)}
 Total Entries: ${summary.totalTransactions}`;
 
@@ -52,7 +55,7 @@ Total Entries: ${summary.totalTransactions}`;
         </button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-3.5">
         {/* Total Credit Card - Green with + sign */}
         <div
           id="card-credits"
@@ -119,6 +122,57 @@ Total Entries: ${summary.totalTransactions}`;
               Filtering table: Showing Debits only
             </div>
           )}
+        </div>
+
+        {/* Remittance Total Card */}
+        <div
+          id="card-remittance-total"
+          className="relative p-4 rounded-xl bg-white border border-sky-200 shadow-xs"
+        >
+          <div className="flex items-center justify-between mb-2">
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-sky-100 text-sky-800">
+              <ArrowLeftRight className="w-3.5 h-3.5 text-sky-600" />
+              Remittance
+            </span>
+            <span className="text-xs font-medium text-sky-700">{summary.remittanceCount} entries</span>
+          </div>
+          <div className="mt-1">
+            <div className="text-2xl font-black tracking-tight text-sky-700">
+              PKR {formatPKR(summary.remittanceTotal)}
+            </div>
+            <p className="text-xs text-slate-500 mt-1">
+              Transfer-related activity total
+            </p>
+          </div>
+        </div>
+
+        {/* Taptap Remittance Card */}
+        <div
+          id="card-remittance-taptap"
+          className="relative p-4 rounded-xl bg-white border border-amber-200 shadow-xs"
+        >
+          <div className="flex items-center justify-between mb-2 gap-2">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <div className="w-6 h-6 rounded-full overflow-hidden border-2 border-white bg-white shadow-sm shrink-0">
+                <img src={taptapIcon} alt="Taptap" className="w-full h-full object-cover" />
+              </div>
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">
+                <ArrowLeftRight className="w-3.5 h-3.5 text-amber-700 mr-1" />
+                Taptap
+              </span>
+            </div>
+            <span className="text-xs font-medium text-amber-700 whitespace-nowrap">
+              {summary.remittanceFromTaptapCount} entries
+            </span>
+          </div>
+          <div className="mt-1">
+            <div className="text-2xl font-black tracking-tight text-amber-700">
+              PKR {formatPKR(summary.remittanceFromTaptapTotal)}
+            </div>
+            <p className="text-xs text-slate-500 mt-1">
+              Remittance from TapTap only
+            </p>
+          </div>
         </div>
 
         {/* Net Flow Card */}
