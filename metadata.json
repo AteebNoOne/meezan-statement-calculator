@@ -1,0 +1,6 @@
+{
+  "name": "Meezan Statement Calculator",
+  "description": "Fast calculator for Meezan Bank PDF account statements, extracting credit (+ green) and debit (- red) entries and computing accurate totals and summaries.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
