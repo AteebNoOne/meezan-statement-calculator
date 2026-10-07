@@ -93,7 +93,7 @@ export function PinModal({ isOpen, onClose, onSuccess }: PinModalProps) {
     >
       <div className="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden transform transition-all animate-in fade-in zoom-in-95 duration-150">
         {/* Header decoration */}
-        <div className="bg-gradient-to-r from-[#581c53] to-[#7b2874] p-5 text-white flex items-center justify-between">
+        <div className="bg-gradient-to-r from-[#008269] to-[#006752] p-5 text-white flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center border border-white/20 shadow-xs">
               <Lock className="w-5 h-5 text-white" />
@@ -102,13 +102,13 @@ export function PinModal({ isOpen, onClose, onSuccess }: PinModalProps) {
               <h3 id="pin-modal-title" className="text-sm font-bold tracking-tight">
                 AI OCR Authorization
               </h3>
-              <p className="text-[11px] text-purple-200">Security PIN required</p>
+              <p className="text-[11px] text-emerald-100">Security PIN required</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-purple-200 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-emerald-100 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
             aria-label="Close"
           >
             <X className="w-4 h-4" />
@@ -135,7 +135,7 @@ export function PinModal({ isOpen, onClose, onSuccess }: PinModalProps) {
               }}
               placeholder="••••"
               autoComplete="one-time-code"
-              className="w-40 text-center tracking-[0.5em] text-2xl font-black py-2.5 px-4 bg-slate-50 border-2 border-slate-300 rounded-xl focus:border-[#581c53] focus:bg-white focus:outline-none focus:ring-4 focus:ring-purple-500/15 transition-all text-slate-800"
+              className="w-40 text-center tracking-[0.5em] text-2xl font-black py-2.5 px-4 bg-slate-50 border-2 border-slate-300 rounded-xl focus:border-[#008269] focus:bg-white focus:outline-none focus:ring-4 focus:ring-emerald-500/15 transition-all text-slate-800"
             />
           </div>
 
@@ -157,7 +157,7 @@ export function PinModal({ isOpen, onClose, onSuccess }: PinModalProps) {
             <button
               type="submit"
               disabled={isVerifying || pin.length === 0}
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-[#581c53] hover:bg-[#461541] disabled:opacity-50 disabled:cursor-not-allowed rounded-xl shadow-sm transition-all cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-[#008269] hover:bg-[#006752] disabled:opacity-50 disabled:cursor-not-allowed rounded-xl shadow-sm transition-all cursor-pointer"
             >
               {isVerifying ? (
                 <>

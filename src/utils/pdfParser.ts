@@ -17,32 +17,50 @@ interface RawTextItem {
   height: number;
 }
 
+interface ExtractedMetadata {
+  bankName: string;
+  accountTitle?: string;
+  accountNumber?: string;
+  iban?: string;
+  cnic?: string;
+  branch?: string;
+  openingBalance?: number | null;
+  closingBalance?: number | null;
+  statementDuration?: string;
+}
+
 /**
- * Extracts transactions directly from a digital PDF using coordinate and regex analysis.
+ * Extracts transactions directly from a digital HBL PDF using coordinate and regex analysis.
  */
-export async function parseMeezanPdf(file: File, pinToken?: string): Promise<ParsedStatementResult> {
+export async function parseHblPdf(file: File, pinToken?: string): Promise<ParsedStatementResult> {
   const arrayBuffer = await file.arrayBuffer();
   const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
   const pdf = await loadingTask.promise;
   const numPages = pdf.numPages;
 
   const allEntries: StatementEntry[] = [];
-  let totalTextItemsCount = 0;
+  let metadata: ExtractedMetadata = {
+    bankName: 'Habib Bank Limited (HBL)',
+  };
 
   for (let pageNum = 1; pageNum <= numPages; pageNum++) {
     const page = await pdf.getPage(pageNum);
     const textContent = await page.getTextContent();
-    totalTextItemsCount += textContent.items.length;
 
     const textItems: RawTextItem[] = textContent.items
       .filter((item: any) => item && typeof item.str === 'string')
       .map((item: any) => ({
-        str: item.str,
+        str: item.str.trim(),
         x: item.transform[4],
         y: item.transform[5],
         width: item.width || 0,
         height: item.height || 0,
-      }));
+      }))
+      .filter((item) => item.str.length > 0);
+
+    if (pageNum === 1) {
+      metadata = extractMetadataFromPage(textItems);
+    }
 
     const pageEntries = extractEntriesFromTextItems(textItems, pageNum);
     allEntries.push(...pageEntries);
@@ -61,7 +79,15 @@ export async function parseMeezanPdf(file: File, pinToken?: string): Promise<Par
   return {
     fileName: file.name,
     pageCount: numPages,
-    bankName: 'Meezan Bank',
+    bankName: metadata.bankName || 'Habib Bank Limited (HBL)',
+    accountTitle: metadata.accountTitle,
+    accountNumber: metadata.accountNumber,
+    iban: metadata.iban,
+    cnic: metadata.cnic,
+    branch: metadata.branch,
+    openingBalance: metadata.openingBalance,
+    closingBalance: metadata.closingBalance,
+    statementDuration: metadata.statementDuration,
     entries: allEntries,
     summary: calculateSummary(allEntries),
     parsedAt: new Date().toISOString(),
@@ -69,15 +95,63 @@ export async function parseMeezanPdf(file: File, pinToken?: string): Promise<Par
 }
 
 /**
- * Parse text items on a page into Meezan Bank transactions.
+ * Extract Account Title, Number, IBAN, and Opening/Closing balance from Page 1
+ */
+function extractMetadataFromPage(items: RawTextItem[]): ExtractedMetadata {
+  const meta: ExtractedMetadata = {
+    bankName: 'Habib Bank Limited (HBL)',
+  };
+
+  const fullText = items.map((i) => i.str).join(' ');
+
+  const titleMatch = fullText.match(/Account Title:\s*([^Address|IBAN|Branch]+?)(?=Address:|IBAN:|Branch:|$)/i);
+  if (titleMatch) meta.accountTitle = titleMatch[1].trim();
+
+  const branchMatch = fullText.match(/Branch:\s*([^Account|Address|IBAN]+?)(?=Account Title:|Address:|IBAN:|$)/i);
+  if (branchMatch) meta.branch = branchMatch[1].trim();
+
+  const ibanMatch = fullText.match(/\b(PK\d{2}[A-Z]{4}\d{16})\b/i);
+  if (ibanMatch) meta.iban = ibanMatch[1];
+
+  const durationMatch = fullText.match(/Statement Duration:\s*([^Account|CNIC]+?)(?=Account Number:|CNIC Number:|$)/i);
+  if (durationMatch) meta.statementDuration = durationMatch[1].trim();
+
+  const accNumMatch = fullText.match(/\b(0400\d{10}|\d{14})\b/);
+  if (accNumMatch) meta.accountNumber = accNumMatch[1];
+
+  const cnicMatch = fullText.match(/\b(\d{13}|\d{5}-\d{7}-\d)\b/);
+  if (cnicMatch) meta.cnic = cnicMatch[1];
+
+  const openBalMatch = fullText.match(/Opening Balance\s*(?:Closing Balance)?\s*([\d,]+\.\d{2})/i);
+  if (openBalMatch) meta.openingBalance = parseFloat(openBalMatch[1].replace(/,/g, ''));
+
+  const closeBalMatch = fullText.match(/Closing Balance\s*([\d,]+\.\d{2})/i);
+  if (closeBalMatch) meta.closingBalance = parseFloat(closeBalMatch[1].replace(/,/g, ''));
+
+  return meta;
+}
+
+/**
+ * Parse text items on a page into HBL Bank transactions.
  */
 function extractEntriesFromTextItems(items: RawTextItem[], pageNum: number): StatementEntry[] {
+  // Find column header X positions if present on this page
+  let debitColX = 0;
+  let creditColX = 0;
+  let balanceColX = 0;
+
+  for (const item of items) {
+    if (/^Debit$/i.test(item.str)) debitColX = item.x;
+    if (/^Credit$/i.test(item.str)) creditColX = item.x;
+    if (/^Balance$/i.test(item.str)) balanceColX = item.x;
+  }
+
   // Group items by Y coordinate with a 5px tolerance
   const sortedByY = [...items].sort((a, b) => b.y - a.y);
   const rows: { y: number; items: RawTextItem[] }[] = [];
 
   for (const item of sortedByY) {
-    let row = rows.find((r) => Math.abs(r.y - item.y) <= 6);
+    let row = rows.find((r) => Math.abs(r.y - item.y) <= 5);
     if (!row) {
       row = { y: item.y, items: [] };
       rows.push(row);
@@ -90,106 +164,110 @@ function extractEntriesFromTextItems(items: RawTextItem[], pageNum: number): Sta
     row.items.sort((a, b) => a.x - b.x);
   }
 
-  // Combine row items to inspect full line text
-  const fullRows = rows.map((row) => ({
-    y: row.y,
-    rawItems: row.items,
-    fullText: row.items.map((i) => i.str).join(' '),
-  }));
-
   const entries: StatementEntry[] = [];
-  const dateRegex = /\b(\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{2,4})\b/i;
-  const creditRegex = /\+\s*(?:PKR|Rs\.?)?\s*([\d,]+\.?\d*)/i;
-  const debitRegex = /-\s*(?:PKR|Rs\.?)?\s*([\d,]+\.?\d*)/i;
+  const dateRegex = /^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}$/;
+  const amountRegex = /^[\d,]+\.\d{2}$/;
 
   let currentEntry: Partial<StatementEntry> | null = null;
   let descriptionLines: string[] = [];
 
-  for (let i = 0; i < fullRows.length; i++) {
-    const row = fullRows[i];
-    const text = row.fullText;
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const rowItems = row.items;
+    const fullText = rowItems.map((it) => it.str).join(' ');
 
-    // Skip headers and page footer
+    // Skip table header & metadata rows
     if (
-      /Booking Date/i.test(text) &&
-      /Description/i.test(text) &&
-      (/Credit/i.test(text) || /Debit/i.test(text))
+      /Transaction\s*Date/i.test(fullText) ||
+      /Value\s*Date/i.test(fullText) ||
+      /Account Activity generated/i.test(fullText) ||
+      /Statement Duration/i.test(fullText) ||
+      /Opening Balance/i.test(fullText) ||
+      /Branch:/i.test(fullText) ||
+      /Account Title:/i.test(fullText)
     ) {
       continue;
     }
-    if (/Meezan Bank/i.test(text) && /Account Statement/i.test(text)) {
-      continue;
-    }
-    if (/Available Balance/i.test(text)) {
-      continue;
-    }
 
-    const dateMatch = text.match(dateRegex);
-    const creditMatch = text.match(creditRegex);
-    const debitMatch = text.match(debitRegex);
+    // Check if row starts with a Transaction Date
+    const firstStr = rowItems[0]?.str || '';
+    const secondStr = rowItems[1]?.str || '';
 
-    // Check if this row has an amount (+ for credit or - for debit)
-    if (creditMatch || debitMatch) {
-      // If we had a previous entry, commit it
+    const hasStartDate = dateRegex.test(firstStr);
+    const hasSecondDate = dateRegex.test(secondStr);
+
+    if (hasStartDate) {
+      // Commit previous entry if complete
       if (currentEntry && currentEntry.type && currentEntry.amount) {
         currentEntry.description = descriptionLines.join(' ').trim();
         entries.push(currentEntry as StatementEntry);
         descriptionLines = [];
       }
 
-      const dateStr: string = dateMatch ? dateMatch[1] : (currentEntry?.bookingDate || 'Unknown Date');
-      let type: 'credit' | 'debit' = creditMatch ? 'credit' : 'debit';
-      let rawAmountStr = creditMatch ? creditMatch[1] : debitMatch![1];
-      const amount = parseFloat(rawAmountStr.replace(/,/g, '')) || 0;
+      const txDate = firstStr;
+      const valDate = hasSecondDate ? secondStr : txDate;
+      const afterDatesItems = rowItems.slice(hasSecondDate ? 2 : 1);
 
-      // Check balance (usually PKR xx,xxx.xx or digits at the rightmost edge)
-      let availableBalance: number | null = null;
-      const balanceMatch = text.match(/(?:PKR|Rs\.?)?\s*([\d,]+\.\d{2})\s*$/i);
-      if (balanceMatch) {
-        const bal = parseFloat(balanceMatch[1].replace(/,/g, ''));
-        if (!isNaN(bal) && bal !== amount) {
-          availableBalance = bal;
+      // Separate numeric amounts at the end vs description text in the middle
+      const numericItems = afterDatesItems.filter((it) => amountRegex.test(it.str.replace(/[^\d.,]/g, '')));
+      const descItems = afterDatesItems.filter((it) => !amountRegex.test(it.str.replace(/[^\d.,]/g, '')));
+
+      let type: 'credit' | 'debit' = 'debit';
+      let amount = 0;
+      let balance: number | null = null;
+
+      if (numericItems.length >= 2) {
+        // Last number is Balance
+        const balanceStr = numericItems[numericItems.length - 1].str;
+        balance = parseFloat(balanceStr.replace(/,/g, ''));
+
+        // Number before balance is the transaction amount (Debit or Credit)
+        const amtItem = numericItems[numericItems.length - 2];
+        amount = parseFloat(amtItem.str.replace(/,/g, '')) || 0;
+
+        // Determine if Credit or Debit by coordinate X comparison
+        if (creditColX > 0 && debitColX > 0) {
+          const distToCredit = Math.abs(amtItem.x - creditColX);
+          const distToDebit = Math.abs(amtItem.x - debitColX);
+          type = distToCredit < distToDebit ? 'credit' : 'debit';
+        } else {
+          // If debit column is generally positioned to the left of credit column:
+          // X < 450 is usually Debit, X >= 450 is Credit in standard A4 landscape/portrait
+          type = amtItem.x > 440 ? 'credit' : 'debit';
+        }
+      } else if (numericItems.length === 1) {
+        const singleItem = numericItems[0];
+        amount = parseFloat(singleItem.str.replace(/,/g, '')) || 0;
+        if (creditColX > 0 && Math.abs(singleItem.x - creditColX) < 40) {
+          type = 'credit';
+        } else {
+          type = 'debit';
         }
       }
 
-      // Filter out date, amount and balance strings from description
-      let descText = text;
-      if (dateMatch) {
-        descText = descText.replace(dateMatch[0], '');
-      }
-      if (creditMatch) {
-        descText = descText.replace(creditMatch[0], '');
-      }
-      if (debitMatch) {
-        descText = descText.replace(debitMatch[0], '');
-      }
-      if (balanceMatch) {
-        descText = descText.replace(balanceMatch[0], '');
-      }
-      descText = descText.replace(/PKR/gi, '').trim();
-
-      descriptionLines = descText ? [descText] : [];
+      const descLine = descItems.map((it) => it.str).join(' ').trim();
+      descriptionLines = descLine ? [descLine] : [];
 
       currentEntry = {
-        id: `entry-${pageNum}-${i}-${Date.now()}`,
-        bookingDate: dateStr,
+        id: `hbl-entry-${pageNum}-${i}-${Date.now()}`,
+        bookingDate: txDate,
+        valueDate: valDate,
         type,
         amount,
         credit: type === 'credit' ? amount : null,
         debit: type === 'debit' ? amount : null,
-        availableBalance,
+        availableBalance: balance,
         pageNumber: pageNum,
       };
     } else if (currentEntry) {
-      // Continuation line for description (e.g. multi-line STAN / party details)
-      // Make sure it's not a footer or page number like "26 19 Sep 2026, 18:35"
-      if (!/^\d+\s+\d{1,2}\s+[A-Za-z]+\s+\d{4}/.test(text) && !/^Page \d+/i.test(text)) {
-        descriptionLines.push(text);
+      // Continuation lines for description (e.g. Raast bank refs, recipient names)
+      if (!/^Page\s*\d+/i.test(fullText)) {
+        descriptionLines.push(fullText);
       }
     }
   }
 
-  // Commit last entry if any
+  // Commit last entry on page
   if (currentEntry && currentEntry.type && currentEntry.amount) {
     currentEntry.description = descriptionLines.join(' ').trim();
     entries.push(currentEntry as StatementEntry);
@@ -239,7 +317,7 @@ export async function parseViaAiServer(file: File, pinToken?: string): Promise<P
   if (!res.ok) {
     if (res.status === 404) {
       throw new Error(
-        'AI OCR server endpoint (/api/parse-statement) returned 404 Not Found. Please ensure your backend server (server.ts / npm run dev / dist/server.cjs) is running and your web server reverse-proxy forwards /api/* requests to it.'
+        'AI OCR server endpoint (/api/parse-statement) returned 404 Not Found. Please ensure your backend server (server.ts / npm run dev / dist/server.cjs) is running.'
       );
     }
     if (res.status === 401 || res.status === 403) {
@@ -258,7 +336,8 @@ export async function parseViaAiServer(file: File, pinToken?: string): Promise<P
 
     return {
       id: `ai-entry-${idx}-${Date.now()}`,
-      bookingDate: e.bookingDate || 'Unknown Date',
+      bookingDate: e.bookingDate || e.transactionDate || 'Unknown Date',
+      valueDate: e.valueDate || e.bookingDate || e.transactionDate || 'Unknown Date',
       description: e.description || '',
       type,
       amount,
@@ -272,9 +351,15 @@ export async function parseViaAiServer(file: File, pinToken?: string): Promise<P
   return {
     fileName: file.name,
     pageCount: 1,
-    bankName: data.bankName || 'Meezan Bank',
+    bankName: data.bankName || 'Habib Bank Limited (HBL)',
     accountTitle: data.accountTitle,
     accountNumber: data.accountNumber,
+    iban: data.iban,
+    cnic: data.cnic,
+    branch: data.branch,
+    openingBalance: data.openingBalance,
+    closingBalance: data.closingBalance,
+    statementDuration: data.statementDuration,
     entries: formattedEntries,
     summary: calculateSummary(formattedEntries),
     parsedAt: new Date().toISOString(),

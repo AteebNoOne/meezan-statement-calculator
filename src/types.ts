@@ -1,6 +1,7 @@
 export interface StatementEntry {
   id: string;
-  bookingDate: string;
+  bookingDate: string; // Transaction Date
+  valueDate?: string;   // Value Date
   description: string;
   type: 'credit' | 'debit';
   amount: number;
@@ -29,6 +30,12 @@ export interface ParsedStatementResult {
   bankName?: string;
   accountTitle?: string;
   accountNumber?: string;
+  iban?: string;
+  cnic?: string;
+  branch?: string;
+  openingBalance?: number | null;
+  closingBalance?: number | null;
+  statementDuration?: string;
   entries: StatementEntry[];
   summary: StatementSummary;
   parsedAt: string;

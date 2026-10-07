@@ -24,7 +24,7 @@ export function StatementSummaryCards({
   };
 
   const handleCopySummary = () => {
-    const text = `Meezan Statement Summary:
+    const text = `HBL Statement Summary:
 -------------------------
 Total Credits (+): + PKR ${formatPKR(summary.totalCredit)} (${summary.creditCount} entries)
 Total Debits (-): - PKR ${formatPKR(summary.totalDebit)} (${summary.debitCount} entries)
@@ -162,7 +162,7 @@ Total Entries: ${summary.totalTransactions} (${summary.creditCount} Credits, ${s
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-1">
-              Credit (+) transfers & remittances
+              Foreign & Swift Inward Remittances
             </p>
           </div>
           {currentFilter === 'remittance' && (
@@ -261,20 +261,20 @@ Total Entries: ${summary.totalTransactions} (${summary.creditCount} Credits, ${s
           onClick={() => onFilterChange('all')}
           className={`relative p-4 rounded-xl border transition-all duration-200 cursor-pointer ${
             currentFilter === 'all'
-              ? 'bg-gradient-to-b from-purple-50 to-purple-100/60 border-[#681c5a] shadow-md ring-2 ring-[#681c5a]/30 -translate-y-0.5'
-              : 'bg-gradient-to-b from-white to-purple-50/20 border-slate-200 hover:border-purple-300 shadow-xs hover:shadow-md hover:shadow-purple-500/10 hover:-translate-y-0.5'
+              ? 'bg-gradient-to-b from-emerald-50 to-emerald-100/60 border-[#008269] shadow-md ring-2 ring-[#008269]/30 -translate-y-0.5'
+              : 'bg-gradient-to-b from-white to-emerald-50/20 border-slate-200 hover:border-emerald-300 shadow-xs hover:shadow-md hover:shadow-emerald-500/10 hover:-translate-y-0.5'
           }`}
         >
           <div className="flex items-center justify-between mb-2">
-            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-[#581c53] shadow-xs">
-              <ListFilter className="w-3.5 h-3.5 text-[#681c5a]" />
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-[#008269] shadow-xs">
+              <ListFilter className="w-3.5 h-3.5 text-[#008269]" />
               Total Entries
             </span>
-            <span className="text-xs font-medium text-[#681c5a]">All rows</span>
+            <span className="text-xs font-medium text-[#008269]">All rows</span>
           </div>
           <div className="mt-1">
             <div
-              className="text-xl sm:text-2xl 2xl:text-xl font-black tracking-tight text-[#581c53] select-all"
+              className="text-xl sm:text-2xl 2xl:text-xl font-black tracking-tight text-[#008269] select-all"
             >
               {summary.totalTransactions}
             </div>

@@ -1,20 +1,42 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# HBL Statement Calculator (Habib Bank Limited)
 
-# Run and deploy your AI Studio app
+A high-performance calculator and analyzer for **HBL (Habib Bank Limited)** account statements (PDF documents and scanned activity reports).
 
-This contains everything you need to run your app locally.
+## Key Features
 
-View your app in AI Studio: https://ai.studio/apps/adc7ab20-eb3a-45ef-a11d-2d4071bc098f
+- **Separate Totals & Remittances**:
+  - **Total Credits (+ PKR)**: Total deposits, inward funds transfers, and remittances.
+  - **Total Debits (- PKR)**: Total withdrawals, card purchases, IBFT outward, taxes, and service charges.
+  - **Foreign & Swift Remittances**: Specifically isolates Swift foreign remittances (including CAD/USD/EUR/GBP inward wires) and international remittance channels.
+  - **TapTap Send Remittance**: Dedicated breakdown for TapTap Send remittances.
+  - **Net Cash Flow**: Instantly computes net financial position (Credits minus Debits).
+- **HBL Account Profile**:
+  - Automatically parses and displays Account Title, Account Number, IBAN, CNIC, Branch, Statement Duration, and Opening/Closing balances.
+- **Accurate HBL Tabular Parsing**:
+  - Accurately aligns columns: `Transaction Date`, `Value Date`, `Description / Narration`, `Credit (+)`, `Debit (-)`, and `Balance`.
+  - Supports multi-line Raast reference numbers, STAN, and digital banking particulars.
+- **AI OCR Document Scanner**:
+  - Built-in Gemini AI document parser for photos, scanned pages, and image-based PDFs (PIN-protected).
+- **CSV Export**:
+  - Export complete transaction ledgers and calculated summaries to CSV (`hbl_statement_[timestamp].csv`).
 
 ## Run Locally
 
-**Prerequisites:**  Node.js
-
+**Prerequisites:** Node.js (v18+)
 
 1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+   ```bash
+   npm install
+   ```
+2. (Optional for AI OCR) Configure your Gemini API key in `.env`:
+   ```env
+   GEMINI_API_KEY="your_api_key_here"
+   ```
+3. Run the development server:
+   ```bash
+   npm run dev
+   ```
+4. Run the test suite:
+   ```bash
+   npm test
+   ```

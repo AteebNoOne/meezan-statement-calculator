@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
-import { MeezanHeader } from './components/MeezanHeader';
+import { HblHeader } from './components/HblHeader';
+import { AccountInfoCard } from './components/AccountInfoCard';
 import { FileUploadArea } from './components/FileUploadArea';
 import { StatementSummaryCards } from './components/StatementSummaryCards';
 import { StatementTable } from './components/StatementTable';
 import { ParsedStatementResult, StatementEntry, StatementFilter } from './types';
-import { calculateSummary } from './data/sampleStatement';
-import { parseMeezanPdf, parseViaAiServer } from './utils/pdfParser';
-import { FileCheck } from 'lucide-react';
+import { calculateSummary, SAMPLE_STATEMENT_RESULT } from './data/sampleStatement';
+import { parseHblPdf, parseViaAiServer } from './utils/pdfParser';
+import { FileCheck, Sparkles } from 'lucide-react';
 
 export default function App() {
-  const [statementData, setStatementData] = useState<ParsedStatementResult | null>(null);
+  const [statementData, setStatementData] = useState<ParsedStatementResult | null>(SAMPLE_STATEMENT_RESULT);
   const [currentFilter, setCurrentFilter] = useState<StatementFilter>('all');
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
@@ -23,11 +24,11 @@ export default function App() {
 
     try {
       if (!forceAi && isPdf) {
-        setLoadingMessage('Processing PDF pages and reading transaction tables...');
-        const result = await parseMeezanPdf(file, pinToken);
+        setLoadingMessage('Processing HBL PDF pages and reading transaction tables...');
+        const result = await parseHblPdf(file, pinToken);
         setStatementData(result);
       } else {
-        setLoadingMessage('Scanning statement with AI recognition...');
+        setLoadingMessage('Scanning HBL statement with AI recognition...');
         const result = await parseViaAiServer(file, pinToken);
         setStatementData(result);
       }
@@ -42,10 +43,10 @@ export default function App() {
           return;
         } catch (aiErr: any) {
           console.error('AI Fallback error:', aiErr);
-          setErrorMessage(aiErr?.message || err?.message || 'Failed to extract statement data. Please ensure it is a valid Meezan statement.');
+          setErrorMessage(aiErr?.message || err?.message || 'Failed to extract statement data. Please ensure it is a valid HBL statement.');
         }
       } else {
-        setErrorMessage(err?.message || 'Failed to extract statement data.');
+        setErrorMessage(err?.message || 'Failed to extract statement data. Please ensure it is a valid HBL statement.');
       }
     } finally {
       setIsLoading(false);
@@ -54,6 +55,11 @@ export default function App() {
 
   const handleReset = () => {
     setStatementData(null);
+    setErrorMessage(null);
+  };
+
+  const handleLoadSample = () => {
+    setStatementData(SAMPLE_STATEMENT_RESULT);
     setErrorMessage(null);
   };
 
@@ -81,8 +87,9 @@ export default function App() {
     if (!statementData) {
       const entries = [newEntry];
       setStatementData({
-        fileName: 'Manual_Statement.pdf',
+        fileName: 'Manual_HBL_Statement.pdf',
         pageCount: 1,
+        bankName: 'Habib Bank Limited (HBL)',
         entries,
         summary: calculateSummary(entries),
         parsedAt: new Date().toISOString(),
@@ -101,9 +108,10 @@ export default function App() {
   const handleExportCsv = () => {
     if (!statementData || statementData.entries.length === 0) return;
 
-    const headers = ['Booking Date', 'Description', 'Type', 'Credit (PKR)', 'Debit (PKR)', 'Available Balance (PKR)'];
+    const headers = ['Transaction Date', 'Value Date', 'Description', 'Type', 'Credit (PKR)', 'Debit (PKR)', 'Balance (PKR)'];
     const rows = statementData.entries.map((e) => [
       `"${e.bookingDate.replace(/"/g, '""')}"`,
+      `"${(e.valueDate || e.bookingDate).replace(/"/g, '""')}"`,
       `"${e.description.replace(/"/g, '""')}"`,
       e.type,
       e.type === 'credit' ? e.amount.toFixed(2) : '',
@@ -115,7 +123,8 @@ export default function App() {
     rows.push([]);
     rows.push([
       '"TOTALS"',
-      `"${statementData.entries.length} entries"`,
+      '',
+      `"${statementData.entries.length} transactions"`,
       '',
       `"+${statementData.summary.totalCredit.toFixed(2)}"`,
       `"-${statementData.summary.totalDebit.toFixed(2)}"`,
@@ -126,7 +135,7 @@ export default function App() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `meezan_statement_${Date.now()}.csv`);
+    link.setAttribute('download', `hbl_statement_${Date.now()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -134,7 +143,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col text-slate-900 font-sans">
-      <MeezanHeader />
+      <HblHeader />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
         {/* Upload & Controls Section */}
@@ -149,23 +158,40 @@ export default function App() {
           />
         </section>
 
+        {/* Account Profile Card (if available) */}
+        {statementData && (
+          <section aria-label="Account Profile">
+            <AccountInfoCard data={statementData} />
+          </section>
+        )}
+
         {/* Loaded Document Info Banner */}
         {statementData && (
           <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-white border border-slate-200 rounded-xl shadow-xs text-xs text-slate-600">
             <div className="flex items-center gap-2">
-              <FileCheck className="w-4 h-4 text-[#581c53]" />
+              <FileCheck className="w-4 h-4 text-[#008269]" />
               <span className="font-semibold text-slate-800">{statementData.fileName}</span>
               {statementData.pageCount > 0 && (
                 <span className="text-slate-400">&bull; {statementData.pageCount} page(s)</span>
               )}
             </div>
-            <div className="text-slate-500">
-              Calculated {statementData.entries.length} transactions across Credit & Debit columns
+            <div className="flex items-center gap-3">
+              <span className="text-slate-500">
+                Calculated {statementData.entries.length} transactions across Credit & Debit columns
+              </span>
+              <button
+                type="button"
+                onClick={handleLoadSample}
+                className="inline-flex items-center gap-1 text-[11px] text-[#008269] hover:underline cursor-pointer font-medium"
+              >
+                <Sparkles className="w-3 h-3 text-[#008269]" />
+                Reload Sample
+              </button>
             </div>
           </div>
         )}
 
-        {/* Summary Cards */}
+        {/* Summary Cards with Separate Totals & Remittances */}
         {statementData && (
           <section aria-label="Summary Totals">
             <StatementSummaryCards
@@ -196,7 +222,7 @@ export default function App() {
       <footer className="mt-auto border-t border-slate-200 bg-white py-4 text-center text-xs text-slate-500">
         <div className="max-w-7xl mx-auto px-4">
           <p>
-            Meezan Statement Calculator &bull; Green (+) Credit entries & Red (-) Debit entries sum computation tool
+            HBL Statement Calculator &bull; Habib Bank Limited Account Activity & Foreign/Swift Remittance Analyzer
           </p>
         </div>
       </footer>

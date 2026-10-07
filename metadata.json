@@ -1,6 +1,6 @@
 {
-  "name": "Meezan Statement Calculator",
-  "description": "Fast calculator for Meezan Bank PDF account statements, extracting credit (+ green) and debit (- red) entries and computing accurate totals and summaries.",
+  "name": "HBL Statement Calculator",
+  "description": "Fast calculator for Habib Bank Limited (HBL) PDF account statements, extracting credit (+ green) and debit (- red) entries, isolating Swift & Foreign remittances, and computing accurate totals and summaries.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

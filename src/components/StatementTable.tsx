@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { StatementEntry, StatementFilter } from '../types';
 import { isRemittanceEntry, isTaptapRemittanceEntry } from '../data/sampleStatement';
-import { Search, Plus, Trash2, Edit2, Check, X, Download, ArrowUpDown } from 'lucide-react';
+import { Search, Plus, Trash2, Edit2, Check, X, Download } from 'lucide-react';
 
 interface StatementTableProps {
   entries: StatementEntry[];
@@ -27,7 +27,8 @@ export function StatementTable({
   const [editForm, setEditForm] = useState<StatementEntry | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [newEntryForm, setNewEntryForm] = useState({
-    bookingDate: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+    bookingDate: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-'),
+    valueDate: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-'),
     description: '',
     type: 'credit' as 'credit' | 'debit',
     amount: '',
@@ -52,6 +53,7 @@ export function StatementTable({
       return (
         entry.description.toLowerCase().includes(q) ||
         entry.bookingDate.toLowerCase().includes(q) ||
+        (entry.valueDate && entry.valueDate.toLowerCase().includes(q)) ||
         entry.amount.toString().includes(q)
       );
     }
@@ -90,7 +92,8 @@ export function StatementTable({
 
     const created: StatementEntry = {
       id: `manual-${Date.now()}`,
-      bookingDate: newEntryForm.bookingDate || '21 Jan 2026',
+      bookingDate: newEntryForm.bookingDate || '30-06-2026',
+      valueDate: newEntryForm.valueDate || newEntryForm.bookingDate || '30-06-2026',
       description: newEntryForm.description || 'Manual Entry',
       type: newEntryForm.type,
       amount: amountVal,
@@ -102,7 +105,8 @@ export function StatementTable({
     onAddEntry(created);
     setIsAddingNew(false);
     setNewEntryForm({
-      bookingDate: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+      bookingDate: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-'),
+      valueDate: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-'),
       description: '',
       type: 'credit',
       amount: '',
@@ -183,14 +187,14 @@ export function StatementTable({
               placeholder="Search description, date, amount..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-8.5 pr-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#681c5a] focus:ring-1 focus:ring-[#681c5a]"
+              className="w-full pl-8.5 pr-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#008269] focus:ring-1 focus:ring-[#008269]"
             />
           </div>
 
           <button
             id="add-entry-btn"
             onClick={() => setIsAddingNew(!isAddingNew)}
-            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-[#581c53] text-white rounded-lg hover:bg-[#461541] transition-colors cursor-pointer shrink-0"
+            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-[#008269] text-white rounded-lg hover:bg-[#006752] transition-colors cursor-pointer shrink-0"
           >
             <Plus className="w-3.5 h-3.5" />
             Add Entry
@@ -210,25 +214,35 @@ export function StatementTable({
 
       {/* Inline Add Form */}
       {isAddingNew && (
-        <form onSubmit={handleCreateNew} className="p-3.5 bg-purple-50/50 border-b border-purple-200">
-          <div className="text-xs font-semibold text-[#581c53] mb-2.5">Add Transaction Entry</div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-2.5">
+        <form onSubmit={handleCreateNew} className="p-3.5 bg-emerald-50/50 border-b border-emerald-200">
+          <div className="text-xs font-semibold text-[#008269] mb-2.5">Add Transaction Entry</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-7 gap-2.5">
             <div>
-              <label className="block text-[11px] text-slate-600 mb-0.5">Booking Date</label>
+              <label className="block text-[11px] text-slate-600 mb-0.5">Transaction Date</label>
               <input
                 type="text"
-                placeholder="21 Jan 2026"
+                placeholder="30-06-2026"
                 value={newEntryForm.bookingDate}
                 onChange={(e) => setNewEntryForm({ ...newEntryForm, bookingDate: e.target.value })}
                 className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-md"
                 required
               />
             </div>
-            <div className="md:col-span-2">
-              <label className="block text-[11px] text-slate-600 mb-0.5">Description</label>
+            <div>
+              <label className="block text-[11px] text-slate-600 mb-0.5">Value Date</label>
               <input
                 type="text"
-                placeholder="e.g. Raast P2P Transfer / POS Transaction"
+                placeholder="30-06-2026"
+                value={newEntryForm.valueDate}
+                onChange={(e) => setNewEntryForm({ ...newEntryForm, valueDate: e.target.value })}
+                className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-md"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-[11px] text-slate-600 mb-0.5">Description / Narration</label>
+              <input
+                type="text"
+                placeholder="e.g. Funds Transfer / Swift Transfer"
                 value={newEntryForm.description}
                 onChange={(e) => setNewEntryForm({ ...newEntryForm, description: e.target.value })}
                 className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-md"
@@ -259,7 +273,7 @@ export function StatementTable({
               />
             </div>
             <div>
-              <label className="block text-[11px] text-slate-600 mb-0.5">Available Balance</label>
+              <label className="block text-[11px] text-slate-600 mb-0.5">Balance</label>
               <input
                 type="number"
                 step="0.01"
@@ -280,7 +294,7 @@ export function StatementTable({
             </button>
             <button
               type="submit"
-              className="px-3.5 py-1 text-xs font-medium text-white bg-[#581c53] rounded-md hover:bg-[#461541] cursor-pointer"
+              className="px-3.5 py-1 text-xs font-medium text-white bg-[#008269] rounded-md hover:bg-[#006752] cursor-pointer"
             >
               Save Entry
             </button>
@@ -288,14 +302,15 @@ export function StatementTable({
         </form>
       )}
 
-      {/* Statement Table formatted in Meezan Bank styling */}
+      {/* Statement Table formatted in HBL Bank styling */}
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse text-xs">
-          {/* Meezan Purple Header */}
+          {/* HBL Teal Header */}
           <thead>
-            <tr className="bg-[#581c53] text-white select-none">
-              <th className="py-2.5 px-3.5 font-semibold tracking-wide w-28">Booking Date</th>
-              <th className="py-2.5 px-3.5 font-semibold tracking-wide min-w-[220px]">Description</th>
+            <tr className="bg-[#008269] text-white select-none">
+              <th className="py-2.5 px-3.5 font-semibold tracking-wide w-28 whitespace-nowrap">Transaction Date</th>
+              <th className="py-2.5 px-3.5 font-semibold tracking-wide w-28 whitespace-nowrap">Value Date</th>
+              <th className="py-2.5 px-3.5 font-semibold tracking-wide min-w-[240px]">Description</th>
               <th className="py-2.5 px-3.5 font-semibold tracking-wide text-right w-36">
                 <span className="inline-flex items-center justify-end gap-1">
                   Credit (+)
@@ -306,7 +321,7 @@ export function StatementTable({
                   Debit (-)
                 </span>
               </th>
-              <th className="py-2.5 px-3.5 font-semibold tracking-wide text-right w-36">Available Balance</th>
+              <th className="py-2.5 px-3.5 font-semibold tracking-wide text-right w-36">Balance</th>
               <th className="py-2.5 px-3.5 font-semibold tracking-wide text-center w-16">Action</th>
             </tr>
           </thead>
@@ -314,7 +329,7 @@ export function StatementTable({
           <tbody className="divide-y divide-slate-200">
             {filteredEntries.length === 0 ? (
               <tr>
-                <td colSpan={6} className="py-10 text-center text-slate-400">
+                <td colSpan={7} className="py-10 text-center text-slate-400">
                   No statement transactions found matching your criteria.
                 </td>
               </tr>
@@ -330,6 +345,14 @@ export function StatementTable({
                           type="text"
                           value={editForm.bookingDate}
                           onChange={(e) => setEditForm({ ...editForm, bookingDate: e.target.value })}
+                          className="w-full px-2 py-1 bg-white border border-slate-300 rounded text-xs"
+                        />
+                      </td>
+                      <td className="p-2">
+                        <input
+                          type="text"
+                          value={editForm.valueDate || editForm.bookingDate}
+                          onChange={(e) => setEditForm({ ...editForm, valueDate: e.target.value })}
                           className="w-full px-2 py-1 bg-white border border-slate-300 rounded text-xs"
                         />
                       </td>
@@ -423,9 +446,14 @@ export function StatementTable({
                       idx % 2 === 1 ? 'bg-slate-50/30' : 'bg-white'
                     }`}
                   >
-                    {/* Booking Date */}
+                    {/* Transaction Date */}
                     <td className="py-3 px-3.5 text-slate-800 font-medium whitespace-nowrap align-top">
                       {entry.bookingDate}
+                    </td>
+
+                    {/* Value Date */}
+                    <td className="py-3 px-3.5 text-slate-500 font-normal whitespace-nowrap align-top">
+                      {entry.valueDate || entry.bookingDate}
                     </td>
 
                     {/* Description */}
@@ -458,7 +486,7 @@ export function StatementTable({
                       )}
                     </td>
 
-                    {/* Available Balance */}
+                    {/* Balance */}
                     <td className="py-3 px-3.5 text-right whitespace-nowrap text-slate-700 font-medium align-top">
                       {entry.availableBalance !== null && entry.availableBalance !== undefined ? (
                         `PKR${formatPKR(entry.availableBalance)}`
@@ -496,7 +524,7 @@ export function StatementTable({
           {entries.length > 0 && (
             <tfoot>
               <tr className="bg-slate-100/90 font-bold border-t-2 border-slate-300 text-slate-800">
-                <td colSpan={2} className="py-3 px-3.5 text-right uppercase tracking-wider text-xs">
+                <td colSpan={3} className="py-3 px-3.5 text-right uppercase tracking-wider text-xs">
                   Summary Totals:
                 </td>
                 <td className="py-3 px-3.5 text-right text-emerald-700 font-black text-sm whitespace-nowrap">
