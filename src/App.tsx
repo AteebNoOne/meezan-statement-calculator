@@ -1,52 +1,62 @@
-import React, { useState } from 'react';
-import { HblHeader } from './components/HblHeader';
+import { useState } from 'react';
+import { BankNavbar } from './components/BankNavbar';
 import { AccountInfoCard } from './components/AccountInfoCard';
 import { FileUploadArea } from './components/FileUploadArea';
 import { StatementSummaryCards } from './components/StatementSummaryCards';
 import { StatementTable } from './components/StatementTable';
-import { ParsedStatementResult, StatementEntry, StatementFilter } from './types';
-import { calculateSummary, SAMPLE_STATEMENT_RESULT } from './data/sampleStatement';
-import { parseHblPdf, parseViaAiServer } from './utils/pdfParser';
+import { ParsedStatementResult, StatementEntry, StatementFilter, BankType } from './types';
+import { calculateSummary, getSampleStatement } from './data/sampleStatement';
+import { parseStatementPdf, parseViaAiServer } from './utils/pdfParser';
 import { FileCheck, Sparkles } from 'lucide-react';
 
 export default function App() {
-  const [statementData, setStatementData] = useState<ParsedStatementResult | null>(SAMPLE_STATEMENT_RESULT);
+  const [currentBank, setCurrentBank] = useState<BankType>('hbl');
+  const [statementData, setStatementData] = useState<ParsedStatementResult | null>(() => getSampleStatement('hbl'));
   const [currentFilter, setCurrentFilter] = useState<StatementFilter>('all');
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const isHbl = currentBank === 'hbl';
+
+  const handleBankChange = (newBank: BankType) => {
+    setCurrentBank(newBank);
+    setStatementData(getSampleStatement(newBank));
+    setCurrentFilter('all');
+    setErrorMessage(null);
+  };
 
   const handleFileSelected = async (file: File, forceAi = false, pinToken?: string) => {
     setIsLoading(true);
     setErrorMessage(null);
 
     const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+    const bankName = isHbl ? 'HBL' : 'Meezan Bank';
 
     try {
       if (!forceAi && isPdf) {
-        setLoadingMessage('Processing HBL PDF pages and reading transaction tables...');
-        const result = await parseHblPdf(file, pinToken);
+        setLoadingMessage(`Processing ${bankName} PDF pages and reading transaction tables...`);
+        const result = await parseStatementPdf(file, currentBank, pinToken);
         setStatementData(result);
       } else {
-        setLoadingMessage('Scanning HBL statement with AI recognition...');
-        const result = await parseViaAiServer(file, pinToken);
+        setLoadingMessage(`Scanning ${bankName} statement with AI recognition...`);
+        const result = await parseViaAiServer(file, currentBank, pinToken);
         setStatementData(result);
       }
     } catch (err: any) {
       console.error('File parsing error:', err);
-      // If client-side failed and user had pinToken, attempt AI fallback
       if (!forceAi && pinToken) {
         try {
           setLoadingMessage('Retrying with AI Enhanced Scanner...');
-          const aiResult = await parseViaAiServer(file, pinToken);
+          const aiResult = await parseViaAiServer(file, currentBank, pinToken);
           setStatementData(aiResult);
           return;
         } catch (aiErr: any) {
           console.error('AI Fallback error:', aiErr);
-          setErrorMessage(aiErr?.message || err?.message || 'Failed to extract statement data. Please ensure it is a valid HBL statement.');
+          setErrorMessage(aiErr?.message || err?.message || `Failed to extract statement data. Please ensure it is a valid ${bankName} statement.`);
         }
       } else {
-        setErrorMessage(err?.message || 'Failed to extract statement data. Please ensure it is a valid HBL statement.');
+        setErrorMessage(err?.message || `Failed to extract statement data. Please ensure it is a valid ${bankName} statement.`);
       }
     } finally {
       setIsLoading(false);
@@ -59,7 +69,7 @@ export default function App() {
   };
 
   const handleLoadSample = () => {
-    setStatementData(SAMPLE_STATEMENT_RESULT);
+    setStatementData(getSampleStatement(currentBank));
     setErrorMessage(null);
   };
 
@@ -87,9 +97,10 @@ export default function App() {
     if (!statementData) {
       const entries = [newEntry];
       setStatementData({
-        fileName: 'Manual_HBL_Statement.pdf',
+        fileName: `Manual_${isHbl ? 'HBL' : 'Meezan'}_Statement.pdf`,
         pageCount: 1,
-        bankName: 'Habib Bank Limited (HBL)',
+        bankType: currentBank,
+        bankName: isHbl ? 'Habib Bank Limited (HBL)' : 'Meezan Bank (The Premier Islamic Bank)',
         entries,
         summary: calculateSummary(entries),
         parsedAt: new Date().toISOString(),
@@ -108,34 +119,60 @@ export default function App() {
   const handleExportCsv = () => {
     if (!statementData || statementData.entries.length === 0) return;
 
-    const headers = ['Transaction Date', 'Value Date', 'Description', 'Type', 'Credit (PKR)', 'Debit (PKR)', 'Balance (PKR)'];
-    const rows = statementData.entries.map((e) => [
-      `"${e.bookingDate.replace(/"/g, '""')}"`,
-      `"${(e.valueDate || e.bookingDate).replace(/"/g, '""')}"`,
-      `"${e.description.replace(/"/g, '""')}"`,
-      e.type,
-      e.type === 'credit' ? e.amount.toFixed(2) : '',
-      e.type === 'debit' ? e.amount.toFixed(2) : '',
-      e.availableBalance !== null && e.availableBalance !== undefined ? e.availableBalance.toFixed(2) : '',
-    ]);
+    const headers = isHbl
+      ? ['Transaction Date', 'Value Date', 'Description', 'Type', 'Credit (PKR)', 'Debit (PKR)', 'Balance (PKR)']
+      : ['Booking Date', 'Description', 'Type', 'Credit (PKR)', 'Debit (PKR)', 'Available Balance (PKR)'];
+
+    const rows = statementData.entries.map((e) => {
+      if (isHbl) {
+        return [
+          `"${e.bookingDate.replace(/"/g, '""')}"`,
+          `"${(e.valueDate || e.bookingDate).replace(/"/g, '""')}"`,
+          `"${e.description.replace(/"/g, '""')}"`,
+          e.type,
+          e.type === 'credit' ? e.amount.toFixed(2) : '',
+          e.type === 'debit' ? e.amount.toFixed(2) : '',
+          e.availableBalance !== null && e.availableBalance !== undefined ? e.availableBalance.toFixed(2) : '',
+        ];
+      }
+      return [
+        `"${e.bookingDate.replace(/"/g, '""')}"`,
+        `"${e.description.replace(/"/g, '""')}"`,
+        e.type,
+        e.type === 'credit' ? e.amount.toFixed(2) : '',
+        e.type === 'debit' ? e.amount.toFixed(2) : '',
+        e.availableBalance !== null && e.availableBalance !== undefined ? e.availableBalance.toFixed(2) : '',
+      ];
+    });
 
     // Add summary row
     rows.push([]);
-    rows.push([
-      '"TOTALS"',
-      '',
-      `"${statementData.entries.length} transactions"`,
-      '',
-      `"+${statementData.summary.totalCredit.toFixed(2)}"`,
-      `"-${statementData.summary.totalDebit.toFixed(2)}"`,
-      `"Net: ${statementData.summary.netFlow.toFixed(2)}"`,
-    ]);
+    rows.push(
+      isHbl
+        ? [
+            '"TOTALS"',
+            '',
+            `"${statementData.entries.length} transactions"`,
+            '',
+            `"+${statementData.summary.totalCredit.toFixed(2)}"`,
+            `"-${statementData.summary.totalDebit.toFixed(2)}"`,
+            `"Net: ${statementData.summary.netFlow.toFixed(2)}"`,
+          ]
+        : [
+            '"TOTALS"',
+            `"${statementData.entries.length} entries"`,
+            '',
+            `"+${statementData.summary.totalCredit.toFixed(2)}"`,
+            `"-${statementData.summary.totalDebit.toFixed(2)}"`,
+            `"Net: ${statementData.summary.netFlow.toFixed(2)}"`,
+          ]
+    );
 
     const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `hbl_statement_${Date.now()}.csv`);
+    link.setAttribute('download', `${isHbl ? 'hbl' : 'meezan'}_statement_${Date.now()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -143,7 +180,8 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col text-slate-900 font-sans">
-      <HblHeader />
+      {/* Top Navbar with Bank Switcher Dropdown */}
+      <BankNavbar currentBank={currentBank} onBankChange={handleBankChange} />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
         {/* Upload & Controls Section */}
@@ -155,13 +193,14 @@ export default function App() {
             errorMessage={errorMessage}
             activeFileName={statementData?.fileName}
             onReset={handleReset}
+            bankType={currentBank}
           />
         </section>
 
-        {/* Account Profile Card (if available) */}
+        {/* Account Profile Card */}
         {statementData && (
           <section aria-label="Account Profile">
-            <AccountInfoCard data={statementData} />
+            <AccountInfoCard data={statementData} bankType={currentBank} />
           </section>
         )}
 
@@ -169,7 +208,7 @@ export default function App() {
         {statementData && (
           <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-white border border-slate-200 rounded-xl shadow-xs text-xs text-slate-600">
             <div className="flex items-center gap-2">
-              <FileCheck className="w-4 h-4 text-[#008269]" />
+              <FileCheck className={`w-4 h-4 ${isHbl ? 'text-[#008269]' : 'text-[#581c53]'}`} />
               <span className="font-semibold text-slate-800">{statementData.fileName}</span>
               {statementData.pageCount > 0 && (
                 <span className="text-slate-400">&bull; {statementData.pageCount} page(s)</span>
@@ -182,10 +221,12 @@ export default function App() {
               <button
                 type="button"
                 onClick={handleLoadSample}
-                className="inline-flex items-center gap-1 text-[11px] text-[#008269] hover:underline cursor-pointer font-medium"
+                className={`inline-flex items-center gap-1 text-[11px] hover:underline cursor-pointer font-medium ${
+                  isHbl ? 'text-[#008269]' : 'text-[#581c53]'
+                }`}
               >
-                <Sparkles className="w-3 h-3 text-[#008269]" />
-                Reload Sample
+                <Sparkles className="w-3 h-3" />
+                Reload {isHbl ? 'HBL' : 'Meezan'} Sample
               </button>
             </div>
           </div>
@@ -198,6 +239,7 @@ export default function App() {
               summary={statementData.summary}
               onFilterChange={setCurrentFilter}
               currentFilter={currentFilter}
+              bankType={currentBank}
             />
           </section>
         )}
@@ -213,6 +255,7 @@ export default function App() {
               onDeleteEntry={handleDeleteEntry}
               onAddEntry={handleAddEntry}
               onExportCsv={handleExportCsv}
+              bankType={currentBank}
             />
           </section>
         )}
@@ -222,7 +265,9 @@ export default function App() {
       <footer className="mt-auto border-t border-slate-200 bg-white py-4 text-center text-xs text-slate-500">
         <div className="max-w-7xl mx-auto px-4">
           <p>
-            HBL Statement Calculator &bull; Habib Bank Limited Account Activity & Foreign/Swift Remittance Analyzer
+            {isHbl
+              ? 'HBL Statement Calculator • Habib Bank Limited Account Activity & Foreign/Swift Remittance Analyzer'
+              : 'Meezan Statement Calculator • Green (+) Credit entries & Red (-) Debit entries sum computation tool'}
           </p>
         </div>
       </footer>

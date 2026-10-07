@@ -1,4 +1,4 @@
-import { StatementSummary, StatementFilter } from '../types';
+import { StatementSummary, StatementFilter, BankType } from '../types';
 import { TrendingUp, TrendingDown, DollarSign, ListFilter, Copy, Check, ArrowLeftRight } from 'lucide-react';
 import { useState } from 'react';
 import taptapIcon from '../data/taptap.png';
@@ -7,14 +7,17 @@ interface SummaryCardsProps {
   summary: StatementSummary;
   onFilterChange: (filter: StatementFilter) => void;
   currentFilter: StatementFilter;
+  bankType?: BankType;
 }
 
 export function StatementSummaryCards({
   summary,
   onFilterChange,
   currentFilter,
+  bankType = 'hbl',
 }: SummaryCardsProps) {
   const [copied, setCopied] = useState(false);
+  const isHbl = bankType === 'hbl';
 
   const formatPKR = (amount: number) => {
     return new Intl.NumberFormat('en-PK', {
@@ -24,7 +27,8 @@ export function StatementSummaryCards({
   };
 
   const handleCopySummary = () => {
-    const text = `HBL Statement Summary:
+    const bankNameTitle = isHbl ? 'HBL' : 'Meezan';
+    const text = `${bankNameTitle} Statement Summary:
 -------------------------
 Total Credits (+): + PKR ${formatPKR(summary.totalCredit)} (${summary.creditCount} entries)
 Total Debits (-): - PKR ${formatPKR(summary.totalDebit)} (${summary.debitCount} entries)
@@ -261,20 +265,30 @@ Total Entries: ${summary.totalTransactions} (${summary.creditCount} Credits, ${s
           onClick={() => onFilterChange('all')}
           className={`relative p-4 rounded-xl border transition-all duration-200 cursor-pointer ${
             currentFilter === 'all'
-              ? 'bg-gradient-to-b from-emerald-50 to-emerald-100/60 border-[#008269] shadow-md ring-2 ring-[#008269]/30 -translate-y-0.5'
-              : 'bg-gradient-to-b from-white to-emerald-50/20 border-slate-200 hover:border-emerald-300 shadow-xs hover:shadow-md hover:shadow-emerald-500/10 hover:-translate-y-0.5'
+              ? isHbl
+                ? 'bg-gradient-to-b from-emerald-50 to-emerald-100/60 border-[#008269] shadow-md ring-2 ring-[#008269]/30 -translate-y-0.5'
+                : 'bg-gradient-to-b from-purple-50 to-purple-100/60 border-[#581c53] shadow-md ring-2 ring-[#581c53]/30 -translate-y-0.5'
+              : isHbl
+              ? 'bg-gradient-to-b from-white to-emerald-50/20 border-slate-200 hover:border-emerald-300 shadow-xs hover:shadow-md hover:shadow-emerald-500/10 hover:-translate-y-0.5'
+              : 'bg-gradient-to-b from-white to-purple-50/20 border-slate-200 hover:border-purple-300 shadow-xs hover:shadow-md hover:shadow-purple-500/10 hover:-translate-y-0.5'
           }`}
         >
           <div className="flex items-center justify-between mb-2">
-            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-[#008269] shadow-xs">
-              <ListFilter className="w-3.5 h-3.5 text-[#008269]" />
+            <span
+              className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold shadow-xs ${
+                isHbl ? 'bg-emerald-100 text-[#008269]' : 'bg-purple-100 text-[#581c53]'
+              }`}
+            >
+              <ListFilter className="w-3.5 h-3.5" />
               Total Entries
             </span>
-            <span className="text-xs font-medium text-[#008269]">All rows</span>
+            <span className={`text-xs font-medium ${isHbl ? 'text-[#008269]' : 'text-[#581c53]'}`}>All rows</span>
           </div>
           <div className="mt-1">
             <div
-              className="text-xl sm:text-2xl 2xl:text-xl font-black tracking-tight text-[#008269] select-all"
+              className={`text-xl sm:text-2xl 2xl:text-xl font-black tracking-tight select-all ${
+                isHbl ? 'text-[#008269]' : 'text-[#581c53]'
+              }`}
             >
               {summary.totalTransactions}
             </div>

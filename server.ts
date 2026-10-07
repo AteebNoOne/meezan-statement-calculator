@@ -71,7 +71,7 @@ async function startServer() {
   // AI Statement Parser endpoint (works on both scanned images and PDF files)
   app.post('/api/parse-statement', async (req, res) => {
     try {
-      const { fileBase64, mimeType, pin, pinToken } = req.body;
+      const { fileBase64, mimeType, pin, pinToken, bank } = req.body;
       const headerToken = req.headers['x-ai-pin-token'] as string | undefined;
 
       // Ensure request is authorized with the PIN
@@ -86,7 +86,21 @@ async function startServer() {
 
       const ai = getGeminiClient();
 
-      const prompt = `You are a financial document parser specialized in HBL (Habib Bank Limited) Account Statements.
+      const prompt = bank === 'meezan'
+        ? `You are a financial document parser specialized in Meezan Bank Account Statements.
+Analyze the provided document (Meezan Bank Account Statement page/document).
+Carefully extract each transaction row from the statement table.
+
+Notice these specific rules for Meezan Bank statements:
+1. "Credit" column: Has a '+' sign, written in GREEN color (e.g. '+ PKR1,000.00', '+ PKR3,000.00'). This represents money deposited or received. Return its positive numeric amount in the "credit" field.
+2. "Debit" column: Has a '-' sign, written in RED color (e.g. '- PKR5,459.00', '- PKR3,900.00'). This represents money withdrawn, spent, or deducted. Return its positive numeric amount in the "debit" field.
+3. Every row has either a credit OR a debit (not both).
+4. Extract the exact Booking Date (e.g. '21 Jan 2026').
+5. Extract the Description (e.g. 'Raast P2P Fund transfer - from AMNA WAJID...', 'CHASE UP POS Transaction STAN (759518)').
+6. Extract the Available Balance (e.g. 11179.55).
+
+Return all rows found in the document accurately.`
+        : `You are a financial document parser specialized in HBL (Habib Bank Limited) Account Statements.
 Analyze the provided document (HBL Bank Account Statement page/document).
 Carefully extract each transaction row from the statement table.
 

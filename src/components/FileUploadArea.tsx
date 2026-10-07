@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Upload, FileText, Sparkles, AlertCircle, RefreshCw, Lock, ShieldCheck } from 'lucide-react';
 import { PinModal } from './PinModal';
+import { BankType } from '../types';
 
 interface FileUploadAreaProps {
   onFileSelected: (file: File, forceAi?: boolean, pinToken?: string) => void;
@@ -9,6 +10,7 @@ interface FileUploadAreaProps {
   errorMessage: string | null;
   activeFileName?: string;
   onReset: () => void;
+  bankType?: BankType;
 }
 
 export function FileUploadArea({
@@ -18,12 +20,15 @@ export function FileUploadArea({
   errorMessage,
   activeFileName,
   onReset,
+  bankType = 'hbl',
 }: FileUploadAreaProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [forceAi, setForceAi] = useState(false);
   const [isPinModalOpen, setIsPinModalOpen] = useState(false);
   const [pinToken, setPinToken] = useState<string | undefined>(undefined);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const isHbl = bankType === 'hbl';
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -48,7 +53,6 @@ export function FileUploadArea({
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
       onFileSelected(file, forceAi, pinToken);
-      // Reset input value so re-selecting same file triggers change
       e.target.value = '';
     }
   };
@@ -79,8 +83,12 @@ export function FileUploadArea({
         onClick={() => !isLoading && fileInputRef.current?.click()}
         className={`relative border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all ${
           isDragOver
-            ? 'border-[#008269] bg-emerald-50/70 scale-[1.005]'
-            : 'border-slate-300 hover:border-[#008269]/70 hover:bg-slate-50/60 bg-white'
+            ? isHbl
+              ? 'border-[#008269] bg-emerald-50/70 scale-[1.005]'
+              : 'border-[#581c53] bg-purple-50/70 scale-[1.005]'
+            : isHbl
+            ? 'border-slate-300 hover:border-[#008269]/70 hover:bg-slate-50/60 bg-white'
+            : 'border-slate-300 hover:border-[#581c53]/70 hover:bg-slate-50/60 bg-white'
         } ${isLoading ? 'opacity-70 pointer-events-none' : ''}`}
       >
         <input
@@ -94,7 +102,7 @@ export function FileUploadArea({
 
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-4">
-            <RefreshCw className="w-8 h-8 text-[#008269] animate-spin mb-3" />
+            <RefreshCw className={`w-8 h-8 animate-spin mb-3 ${isHbl ? 'text-[#008269]' : 'text-[#581c53]'}`} />
             <p className="text-sm font-semibold text-slate-800">{loadingMessage}</p>
             <p className="text-xs text-slate-500 mt-1">
               Extracting date, description, credit (+ green) and debit (- red) columns...
@@ -102,12 +110,20 @@ export function FileUploadArea({
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center">
-            <div className="w-12 h-12 rounded-full bg-emerald-100/80 flex items-center justify-center text-[#008269] mb-3">
+            <div
+              className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 ${
+                isHbl ? 'bg-emerald-100/80 text-[#008269]' : 'bg-purple-100/80 text-[#581c53]'
+              }`}
+            >
               <Upload className="w-6 h-6" />
             </div>
 
             <h3 className="text-base font-semibold text-slate-800">
-              {activeFileName ? `Change Statement: ${activeFileName}` : 'Drop HBL Bank Statement PDF here'}
+              {activeFileName
+                ? `Change Statement: ${activeFileName}`
+                : isHbl
+                ? 'Drop HBL Bank Statement PDF here'
+                : 'Drop Meezan Bank Statement PDF here'}
             </h3>
             <p className="text-xs text-slate-500 mt-1 max-w-md">
               Drag and drop your account statement PDF or click to browse. Supports digital statements and scanned page photos.
@@ -138,7 +154,9 @@ export function FileUploadArea({
               id="toggle-force-ai"
               checked={forceAi}
               onChange={handleToggleAi}
-              className="rounded border-slate-300 text-[#008269] focus:ring-[#008269] w-4 h-4 cursor-pointer"
+              className={`rounded border-slate-300 w-4 h-4 cursor-pointer ${
+                isHbl ? 'text-[#008269] focus:ring-[#008269]' : 'text-[#581c53] focus:ring-[#581c53]'
+              }`}
             />
             <span className="flex items-center gap-1.5 font-medium text-slate-800">
               <Sparkles className="w-3.5 h-3.5 text-amber-600" />

@@ -1,7 +1,9 @@
+export type BankType = 'hbl' | 'meezan';
+
 export interface StatementEntry {
   id: string;
-  bookingDate: string; // Transaction Date
-  valueDate?: string;   // Value Date
+  bookingDate: string; // Transaction Date / Booking Date
+  valueDate?: string;   // Value Date (HBL)
   description: string;
   type: 'credit' | 'debit';
   amount: number;
@@ -27,6 +29,7 @@ export interface StatementSummary {
 export interface ParsedStatementResult {
   fileName: string;
   pageCount: number;
+  bankType?: BankType;
   bankName?: string;
   accountTitle?: string;
   accountNumber?: string;
