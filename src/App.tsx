@@ -5,13 +5,13 @@ import { FileUploadArea } from './components/FileUploadArea';
 import { StatementSummaryCards } from './components/StatementSummaryCards';
 import { StatementTable } from './components/StatementTable';
 import { ParsedStatementResult, StatementEntry, StatementFilter, BankType } from './types';
-import { calculateSummary, getSampleStatement } from './data/sampleStatement';
+import { calculateSummary } from './data/summaryHelper';
 import { parseStatementPdf, parseViaAiServer } from './utils/pdfParser';
-import { FileCheck, Sparkles } from 'lucide-react';
+import { FileCheck, FileText, Plus } from 'lucide-react';
 
 export default function App() {
   const [currentBank, setCurrentBank] = useState<BankType>('hbl');
-  const [statementData, setStatementData] = useState<ParsedStatementResult | null>(() => getSampleStatement('hbl'));
+  const [statementData, setStatementData] = useState<ParsedStatementResult | null>(null);
   const [currentFilter, setCurrentFilter] = useState<StatementFilter>('all');
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
@@ -21,7 +21,7 @@ export default function App() {
 
   const handleBankChange = (newBank: BankType) => {
     setCurrentBank(newBank);
-    setStatementData(getSampleStatement(newBank));
+    setStatementData(null);
     setCurrentFilter('all');
     setErrorMessage(null);
   };
@@ -68,8 +68,16 @@ export default function App() {
     setErrorMessage(null);
   };
 
-  const handleLoadSample = () => {
-    setStatementData(getSampleStatement(currentBank));
+  const handleCreateBlank = () => {
+    setStatementData({
+      fileName: `Manual_${isHbl ? 'HBL' : 'Meezan'}_Statement.pdf`,
+      pageCount: 1,
+      bankType: currentBank,
+      bankName: isHbl ? 'Habib Bank Limited (HBL)' : 'Meezan Bank (The Premier Islamic Bank)',
+      entries: [],
+      summary: calculateSummary([]),
+      parsedAt: new Date().toISOString(),
+    });
     setErrorMessage(null);
   };
 
@@ -218,15 +226,29 @@ export default function App() {
               <span className="text-slate-500">
                 Calculated {statementData.entries.length} transactions across Credit & Debit columns
               </span>
+            </div>
+          </div>
+        )}
+
+        {/* Clean Empty State when no statement is loaded */}
+        {!statementData && (
+          <div className="text-center py-12 px-4 border border-dashed border-slate-200 rounded-xl bg-white/60 text-slate-500">
+            <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-3 text-slate-400">
+              <FileText className="w-5 h-5" />
+            </div>
+            <h4 className="text-sm font-semibold text-slate-700">No Statement Loaded</h4>
+            <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+              Upload your {isHbl ? 'HBL' : 'Meezan Bank'} account statement PDF or image above to calculate totals, or start with a blank table.
+            </p>
+            <div className="mt-4">
               <button
                 type="button"
-                onClick={handleLoadSample}
-                className={`inline-flex items-center gap-1 text-[11px] hover:underline cursor-pointer font-medium ${
-                  isHbl ? 'text-[#008269]' : 'text-[#581c53]'
-                }`}
+                id="create-blank-btn"
+                onClick={handleCreateBlank}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer shadow-2xs"
               >
-                <Sparkles className="w-3 h-3" />
-                Reload {isHbl ? 'HBL' : 'Meezan'} Sample
+                <Plus className="w-3.5 h-3.5 text-slate-500" />
+                Start with a blank sheet
               </button>
             </div>
           </div>

@@ -96,7 +96,7 @@ Notice these specific rules for Meezan Bank statements:
 2. "Debit" column: Has a '-' sign, written in RED color (e.g. '- PKR5,459.00', '- PKR3,900.00'). This represents money withdrawn, spent, or deducted. Return its positive numeric amount in the "debit" field.
 3. Every row has either a credit OR a debit (not both).
 4. Extract the exact Booking Date (e.g. '21 Jan 2026').
-5. Extract the Description (e.g. 'Raast P2P Fund transfer - from AMNA WAJID...', 'CHASE UP POS Transaction STAN (759518)').
+5. Extract the Description (e.g. 'Raast P2P Fund transfer...', 'POS Transaction STAN (123456)').
 6. Extract the Available Balance (e.g. 11179.55).
 
 Return all rows found in the document accurately.`

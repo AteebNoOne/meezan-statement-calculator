@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { StatementEntry, StatementFilter, BankType } from '../types';
-import { isRemittanceEntry, isTaptapRemittanceEntry } from '../data/sampleStatement';
+import { isRemittanceEntry, isTaptapRemittanceEntry } from '../data/summaryHelper';
 import { Search, Plus, Trash2, Edit2, Check, X, Download } from 'lucide-react';
 
 interface StatementTableProps {
@@ -30,12 +30,8 @@ export function StatementTable({
   const [editForm, setEditForm] = useState<StatementEntry | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [newEntryForm, setNewEntryForm] = useState({
-    bookingDate: isHbl
-      ? new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-')
-      : new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-    valueDate: isHbl
-      ? new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-')
-      : '',
+    bookingDate: '',
+    valueDate: '',
     description: '',
     type: 'credit' as 'credit' | 'debit',
     amount: '',
@@ -97,10 +93,14 @@ export function StatementTable({
     const amountVal = parseFloat(newEntryForm.amount);
     if (isNaN(amountVal) || amountVal <= 0) return;
 
+    const todayFormatted = isHbl
+      ? new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-')
+      : new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+
     const created: StatementEntry = {
       id: `manual-${Date.now()}`,
-      bookingDate: newEntryForm.bookingDate || (isHbl ? '30-06-2026' : '21 Jan 2026'),
-      valueDate: isHbl ? (newEntryForm.valueDate || newEntryForm.bookingDate) : undefined,
+      bookingDate: newEntryForm.bookingDate || todayFormatted,
+      valueDate: isHbl ? (newEntryForm.valueDate || newEntryForm.bookingDate || todayFormatted) : undefined,
       description: newEntryForm.description || 'Manual Entry',
       type: newEntryForm.type,
       amount: amountVal,
@@ -112,12 +112,8 @@ export function StatementTable({
     onAddEntry(created);
     setIsAddingNew(false);
     setNewEntryForm({
-      bookingDate: isHbl
-        ? new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-')
-        : new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-      valueDate: isHbl
-        ? new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-')
-        : '',
+      bookingDate: '',
+      valueDate: '',
       description: '',
       type: 'credit',
       amount: '',
@@ -245,7 +241,7 @@ export function StatementTable({
               </label>
               <input
                 type="text"
-                placeholder={isHbl ? '30-06-2026' : '21 Jan 2026'}
+                placeholder={isHbl ? 'DD-MM-YYYY' : 'DD Mon YYYY'}
                 value={newEntryForm.bookingDate}
                 onChange={(e) => setNewEntryForm({ ...newEntryForm, bookingDate: e.target.value })}
                 className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-md"
@@ -257,7 +253,7 @@ export function StatementTable({
                 <label className="block text-[11px] text-slate-600 mb-0.5">Value Date</label>
                 <input
                   type="text"
-                  placeholder="30-06-2026"
+                  placeholder="DD-MM-YYYY"
                   value={newEntryForm.valueDate}
                   onChange={(e) => setNewEntryForm({ ...newEntryForm, valueDate: e.target.value })}
                   className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-md"

@@ -1,6 +1,6 @@
 import * as pdfjsLib from 'pdfjs-dist';
 import { StatementEntry, ParsedStatementResult, BankType } from '../types';
-import { calculateSummary } from '../data/sampleStatement';
+import { calculateSummary } from '../data/summaryHelper';
 
 // Set up worker
 try {
@@ -182,7 +182,7 @@ function extractHblMetadataFromPage(items: RawTextItem[]): ExtractedMetadata {
   const durationMatch = fullText.match(/Statement Duration:\s*([^Account|CNIC]+?)(?=Account Number:|CNIC Number:|$)/i);
   if (durationMatch) meta.statementDuration = durationMatch[1].trim();
 
-  const accNumMatch = fullText.match(/\b(0400\d{10}|\d{14})\b/);
+  const accNumMatch = fullText.match(/\b\d{14}\b/);
   if (accNumMatch) meta.accountNumber = accNumMatch[1];
 
   const cnicMatch = fullText.match(/\b(\d{13}|\d{5}-\d{7}-\d)\b/);
