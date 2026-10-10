@@ -1,13 +1,13 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { BankNavbar } from './components/BankNavbar';
 import { AccountInfoCard } from './components/AccountInfoCard';
 import { FileUploadArea } from './components/FileUploadArea';
 import { StatementSummaryCards } from './components/StatementSummaryCards';
 import { StatementTable } from './components/StatementTable';
-import { ParsedStatementResult, StatementEntry, StatementFilter, BankType } from './types';
+import { ParsedStatementResult, StatementEntry, StatementFilter, BankType, ParseProgress } from './types';
 import { calculateSummary } from './data/summaryHelper';
-import { parseStatementPdf, parseViaAiServer } from './utils/pdfParser';
-import { FileCheck, FileText, Plus } from 'lucide-react';
+import { parseStatementPdf, parseViaAiServer, rescanSinglePdfPage } from './utils/pdfParser';
+import { FileCheck, FileText, Plus, AlertTriangle, RefreshCw } from 'lucide-react';
 
 export default function App() {
   const [currentBank, setCurrentBank] = useState<BankType>('hbl');
@@ -16,54 +16,158 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [parseProgress, setParseProgress] = useState<ParseProgress | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [currentFile, setCurrentFile] = useState<File | null>(null);
+  const [activePinToken, setActivePinToken] = useState<string | undefined>(undefined);
+  const [rescanningPage, setRescanningPage] = useState<number | null>(null);
+
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const timerRef = useRef<number | null>(null);
 
   const isHbl = currentBank === 'hbl';
 
   const handleBankChange = (newBank: BankType) => {
     setCurrentBank(newBank);
     setStatementData(null);
+    setCurrentFile(null);
     setCurrentFilter('all');
     setErrorMessage(null);
+    setParseProgress(null);
+  };
+
+  const handleRescanPage = async (pageNumber: number) => {
+    if (!currentFile || !statementData) return;
+    setRescanningPage(pageNumber);
+    setErrorMessage(null);
+
+    try {
+      const recoveredEntries = await rescanSinglePdfPage(
+        currentFile,
+        pageNumber,
+        currentBank,
+        activePinToken
+      );
+
+      // Merge recovered entries, avoiding duplicates for this page
+      const existingWithoutThisPage = statementData.entries.filter(
+        (e) => e.pageNumber !== pageNumber
+      );
+      const updatedEntries = [...existingWithoutThisPage, ...recoveredEntries].sort(
+        (a, b) => (a.pageNumber || 1) - (b.pageNumber || 1)
+      );
+
+      // Remove pageNumber from failedPages
+      const updatedFailedPages = statementData.failedPages?.filter(
+        (fp) => fp.pageNumber !== pageNumber
+      );
+
+      setStatementData({
+        ...statementData,
+        entries: updatedEntries,
+        summary: calculateSummary(updatedEntries),
+        failedPages: updatedFailedPages && updatedFailedPages.length > 0 ? updatedFailedPages : undefined,
+      });
+    } catch (err: any) {
+      console.error(`Failed to rescan page ${pageNumber}:`, err);
+      setErrorMessage(`Failed to rescan Page ${pageNumber}: ${err?.message || 'Unknown error'}`);
+    } finally {
+      setRescanningPage(null);
+    }
+  };
+
+  const handleCancelScan = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    if (timerRef.current) {
+      window.clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    setIsLoading(false);
+    setParseProgress(null);
+    setLoadingMessage('');
+    setErrorMessage('Statement scan was cancelled by user.');
   };
 
   const handleFileSelected = async (file: File, forceAi = false, pinToken?: string) => {
+    setCurrentFile(file);
+    setActivePinToken(pinToken);
     setIsLoading(true);
     setErrorMessage(null);
+    setParseProgress(null);
+    setElapsedSeconds(0);
+
+    // Abort any prior in-flight request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
+    // Start elapsed seconds timer
+    if (timerRef.current) window.clearInterval(timerRef.current);
+    const startTime = Date.now();
+    timerRef.current = window.setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - startTime) / 1000));
+    }, 1000);
 
     const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
     const bankName = isHbl ? 'HBL' : 'Meezan Bank';
 
+    const onProgress = (prog: ParseProgress) => {
+      setParseProgress(prog);
+      setLoadingMessage(prog.message);
+    };
+
     try {
       if (!forceAi && isPdf) {
-        setLoadingMessage(`Processing ${bankName} PDF pages and reading transaction tables...`);
-        const result = await parseStatementPdf(file, currentBank, pinToken);
+        setLoadingMessage(`Reading digital ${bankName} statement tables...`);
+        const result = await parseStatementPdf(file, currentBank, pinToken, onProgress, abortController.signal);
         setStatementData(result);
       } else {
-        setLoadingMessage(`Scanning ${bankName} statement with AI recognition...`);
-        const result = await parseViaAiServer(file, currentBank, pinToken);
+        setLoadingMessage(`Analyzing ${bankName} statement with Gemini 3.5 Flash...`);
+        const result = await parseViaAiServer(file, currentBank, pinToken, onProgress, abortController.signal);
         setStatementData(result);
       }
     } catch (err: any) {
+      if (abortController.signal.aborted || err?.name === 'AbortError' || err?.message?.includes('cancelled')) {
+        setErrorMessage('Statement scan was cancelled.');
+        return;
+      }
       console.error('File parsing error:', err);
       if (!forceAi && pinToken) {
         try {
-          setLoadingMessage('Retrying with AI Enhanced Scanner...');
-          const aiResult = await parseViaAiServer(file, currentBank, pinToken);
+          setLoadingMessage('Retrying with Gemini 3.5 Flash Enhanced Scanner...');
+          const aiResult = await parseViaAiServer(file, currentBank, pinToken, onProgress, abortController.signal);
           setStatementData(aiResult);
           return;
         } catch (aiErr: any) {
+          if (abortController.signal.aborted || aiErr?.name === 'AbortError' || aiErr?.message?.includes('cancelled')) {
+            setErrorMessage('Statement scan was cancelled.');
+            return;
+          }
           console.error('AI Fallback error:', aiErr);
-          setErrorMessage(aiErr?.message || err?.message || `Failed to extract statement data. Please ensure it is a valid ${bankName} statement.`);
+          setErrorMessage(
+            aiErr?.message || err?.message || `Failed to extract statement data. Please ensure it is a valid ${bankName} statement.`
+          );
         }
       } else {
         setErrorMessage(err?.message || `Failed to extract statement data. Please ensure it is a valid ${bankName} statement.`);
       }
     } finally {
+      if (timerRef.current) {
+        window.clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
       setIsLoading(false);
+      setParseProgress(null);
     }
   };
 
   const handleReset = () => {
+    setCurrentFile(null);
+    setActivePinToken(undefined);
     setStatementData(null);
     setErrorMessage(null);
   };
@@ -202,6 +306,9 @@ export default function App() {
             activeFileName={statementData?.fileName}
             onReset={handleReset}
             bankType={currentBank}
+            progress={parseProgress}
+            elapsedSeconds={elapsedSeconds}
+            onCancel={handleCancelScan}
           />
         </section>
 
@@ -226,6 +333,39 @@ export default function App() {
               <span className="text-slate-500">
                 Calculated {statementData.entries.length} transactions across Credit & Debit columns
               </span>
+            </div>
+          </div>
+        )}
+
+        {/* Failed Pages Warning & Rescan Banner */}
+        {statementData && statementData.failedPages && statementData.failedPages.length > 0 && (
+          <div className="p-3.5 bg-amber-50/90 border border-amber-200 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs text-amber-900 shadow-xs">
+            <div className="flex items-start sm:items-center gap-2.5">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5 sm:mt-0" />
+              <div>
+                <span className="font-semibold text-amber-950">
+                  {statementData.failedPages.length === 1
+                    ? `Page ${statementData.failedPages[0].pageNumber} was skipped during scan`
+                    : `${statementData.failedPages.length} pages were skipped during scan`}
+                </span>
+                <span className="text-amber-800 text-[11px] block sm:inline sm:ml-1.5">
+                  ({statementData.entries.length} transactions from other {statementData.pageCount - statementData.failedPages.length} page(s) loaded successfully).
+                </span>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {statementData.failedPages.map((fp) => (
+                <button
+                  key={fp.pageNumber}
+                  type="button"
+                  disabled={rescanningPage === fp.pageNumber}
+                  onClick={() => handleRescanPage(fp.pageNumber)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-medium text-xs shadow-xs transition-colors cursor-pointer"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${rescanningPage === fp.pageNumber ? 'animate-spin' : ''}`} />
+                  {rescanningPage === fp.pageNumber ? `Rescanning Page ${fp.pageNumber}...` : `Rescan Page ${fp.pageNumber}`}
+                </button>
+              ))}
             </div>
           </div>
         )}

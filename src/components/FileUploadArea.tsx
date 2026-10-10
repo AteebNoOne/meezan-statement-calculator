@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Upload, FileText, Sparkles, AlertCircle, RefreshCw, Lock, ShieldCheck } from 'lucide-react';
 import { PinModal } from './PinModal';
-import { BankType } from '../types';
+import { BankType, ParseProgress } from '../types';
 
 interface FileUploadAreaProps {
   onFileSelected: (file: File, forceAi?: boolean, pinToken?: string) => void;
@@ -11,6 +11,9 @@ interface FileUploadAreaProps {
   activeFileName?: string;
   onReset: () => void;
   bankType?: BankType;
+  progress?: ParseProgress | null;
+  elapsedSeconds?: number;
+  onCancel?: () => void;
 }
 
 export function FileUploadArea({
@@ -21,6 +24,9 @@ export function FileUploadArea({
   activeFileName,
   onReset,
   bankType = 'hbl',
+  progress,
+  elapsedSeconds,
+  onCancel,
 }: FileUploadAreaProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [forceAi, setForceAi] = useState(false);
@@ -101,12 +107,76 @@ export function FileUploadArea({
         />
 
         {isLoading ? (
-          <div className="flex flex-col items-center justify-center py-4">
-            <RefreshCw className={`w-8 h-8 animate-spin mb-3 ${isHbl ? 'text-[#008269]' : 'text-[#581c53]'}`} />
-            <p className="text-sm font-semibold text-slate-800">{loadingMessage}</p>
-            <p className="text-xs text-slate-500 mt-1">
-              Extracting date, description, credit (+ green) and debit (- red) columns...
+          <div className="flex flex-col items-center justify-center py-6 px-4">
+            <div className="relative mb-3">
+              <RefreshCw className={`w-8 h-8 animate-spin ${isHbl ? 'text-[#008269]' : 'text-[#581c53]'}`} />
+              <Sparkles className="w-3.5 h-3.5 text-amber-500 absolute -top-1 -right-1 animate-pulse" />
+            </div>
+
+            <p className="text-sm font-semibold text-slate-800 text-center max-w-md">
+              {progress?.message || loadingMessage}
             </p>
+
+            {/* Dynamic Progress Bar */}
+            {progress && progress.totalPages > 0 && (
+              <div className="w-full max-w-sm mt-3.5 space-y-1.5">
+                <div className="flex items-center justify-between text-xs text-slate-600 font-medium">
+                  <span>
+                    {progress.stage === 'reading'
+                      ? 'Reading file...'
+                      : `Page ${progress.currentPage} of ${progress.totalPages}`}
+                  </span>
+                  <span>
+                    {progress.currentPage > 0
+                      ? `${Math.round((progress.currentPage / progress.totalPages) * 100)}%`
+                      : '0%'}
+                  </span>
+                </div>
+                <div className="w-full bg-slate-200/90 rounded-full h-2 overflow-hidden shadow-inner">
+                  <div
+                    className={`h-2 rounded-full transition-all duration-300 ease-out ${
+                      isHbl ? 'bg-[#008269]' : 'bg-[#581c53]'
+                    }`}
+                    style={{
+                      width: `${
+                        progress.currentPage > 0
+                          ? Math.min(100, Math.max(5, Math.round((progress.currentPage / progress.totalPages) * 100)))
+                          : 5
+                      }%`,
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Status indicators: Count & Timer */}
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-2.5 text-xs text-slate-600">
+              {progress && progress.entriesFound > 0 && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-medium border border-emerald-200 shadow-2xs">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping inline-block" />
+                  {progress.entriesFound} transactions extracted
+                </span>
+              )}
+              {elapsedSeconds !== undefined && elapsedSeconds > 0 && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[11px] font-mono border border-slate-200">
+                  Elapsed: {elapsedSeconds}s
+                </span>
+              )}
+            </div>
+
+            {/* Cancel Button */}
+            {onCancel && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCancel();
+                }}
+                className="mt-4 px-3.5 py-1 text-xs font-medium text-rose-600 hover:text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-md transition-colors cursor-pointer"
+              >
+                Cancel Scan
+              </button>
+            )}
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center">

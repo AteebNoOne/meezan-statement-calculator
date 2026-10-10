@@ -26,6 +26,11 @@ export interface StatementSummary {
   totalTransactions: number;
 }
 
+export interface FailedPageInfo {
+  pageNumber: number;
+  reason?: string;
+}
+
 export interface ParsedStatementResult {
   fileName: string;
   pageCount: number;
@@ -42,6 +47,16 @@ export interface ParsedStatementResult {
   entries: StatementEntry[];
   summary: StatementSummary;
   parsedAt: string;
+  failedPages?: FailedPageInfo[];
 }
 
 export type StatementFilter = 'all' | 'credit' | 'debit' | 'remittance' | 'taptap';
+
+export interface ParseProgress {
+  stage: 'reading' | 'rendering' | 'processing' | 'retrying' | 'aggregating' | 'done';
+  currentPage: number;
+  totalPages: number;
+  message: string;
+  entriesFound: number;
+  failedPages?: number[];
+}

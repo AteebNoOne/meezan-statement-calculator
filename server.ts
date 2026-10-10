@@ -41,6 +41,45 @@ function getGeminiClient(): GoogleGenAI {
   return geminiClient;
 }
 
+function tryRepairAndParseJson(raw: string): any {
+  try {
+    return JSON.parse(raw);
+  } catch (initialErr) {
+    console.warn('Initial JSON.parse failed on Gemini response, attempting partial recovery...');
+
+    // Look for the entries array start
+    const entriesIndex = raw.indexOf('"entries"');
+    if (entriesIndex === -1) {
+      throw initialErr;
+    }
+
+    const bracketIndex = raw.indexOf('[', entriesIndex);
+    if (bracketIndex === -1) {
+      throw initialErr;
+    }
+
+    // Try finding valid sub-slices from the last closing brace backwards
+    let pos = raw.lastIndexOf('}');
+    while (pos > bracketIndex) {
+      const candidateSub = raw.substring(0, pos + 1);
+      // Attempt to close the entries array and root object
+      const candidateJson = `${candidateSub}\n]\n}`;
+      try {
+        const parsed = JSON.parse(candidateJson);
+        if (parsed && Array.isArray(parsed.entries) && parsed.entries.length > 0) {
+          console.log(`Successfully recovered ${parsed.entries.length} entries from truncated JSON!`);
+          return parsed;
+        }
+      } catch {
+        // Find previous closing brace
+        pos = raw.lastIndexOf('}', pos - 1);
+      }
+    }
+
+    throw initialErr;
+  }
+}
+
 async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT) || 3000;
@@ -85,10 +124,16 @@ async function startServer() {
       }
 
       const ai = getGeminiClient();
+      const model = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
+
+      // Clean base64 data if data URL prefix exists
+      const cleanData = typeof fileBase64 === 'string' && fileBase64.includes(',')
+        ? fileBase64.split(',')[1]
+        : fileBase64;
 
       const prompt = bank === 'meezan'
         ? `You are a financial document parser specialized in Meezan Bank Account Statements.
-Analyze the provided document (Meezan Bank Account Statement page/document).
+Analyze the provided document (Meezan Bank Account Statement page or document).
 Carefully extract each transaction row from the statement table.
 
 Notice these specific rules for Meezan Bank statements:
@@ -98,10 +143,12 @@ Notice these specific rules for Meezan Bank statements:
 4. Extract the exact Booking Date (e.g. '21 Jan 2026').
 5. Extract the Description (e.g. 'Raast P2P Fund transfer...', 'POS Transaction STAN (123456)').
 6. Extract the Available Balance (e.g. 11179.55).
+7. If account header metadata (Account Title, Account Number, IBAN, etc.) is present on this page, extract it; otherwise omit or leave blank.
+8. Extract each distinct transaction once. Do not repeat entries, avoid duplicate loops, and keep descriptions concise.
 
-Return all rows found in the document accurately.`
+Return all rows found accurately.`
         : `You are a financial document parser specialized in HBL (Habib Bank Limited) Account Statements.
-Analyze the provided document (HBL Bank Account Statement page/document).
+Analyze the provided document (HBL Bank Account Statement page or document).
 Carefully extract each transaction row from the statement table.
 
 Notice these specific rules for HBL (Habib Bank Limited) statements:
@@ -111,11 +158,13 @@ Notice these specific rules for HBL (Habib Bank Limited) statements:
 4. Extract the exact Booking / Post / Value Date (e.g. '21 Jan 2026', '21-Jan-2026', or '21/01/2026').
 5. Extract the Description / Narration / Particulars (e.g. 'HBL RAAST P2P INWARD CR...', 'HBL 1LINK ATM WDL STAN (759518)').
 6. Extract the Available / Running Balance (e.g. 11179.55).
+7. If account header metadata (Account Title, Account Number, IBAN, etc.) is present on this page, extract it; otherwise omit or leave blank.
+8. Extract each distinct transaction once. Do not repeat entries, avoid duplicate loops, and keep descriptions concise.
 
-Return all rows found in the document accurately.`;
+Return all rows found accurately.`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
+        model,
         contents: [
           {
             role: 'user',
@@ -123,7 +172,7 @@ Return all rows found in the document accurately.`;
               {
                 inlineData: {
                   mimeType,
-                  data: fileBase64,
+                  data: cleanData,
                 },
               },
               {
@@ -134,6 +183,8 @@ Return all rows found in the document accurately.`;
         ],
         config: {
           responseMimeType: 'application/json',
+          temperature: 0.1,
+          maxOutputTokens: 16384,
           responseSchema: {
             type: Type.OBJECT,
             properties: {
@@ -174,13 +225,17 @@ Return all rows found in the document accurately.`;
       });
 
       const responseText = response.text || '{}';
-      const parsedData = JSON.parse(responseText);
+      const parsedData = tryRepairAndParseJson(responseText);
 
       return res.json(parsedData);
     } catch (error: any) {
-      console.error('Error parsing statement:', error);
+      console.error('Error parsing statement with Gemini AI:', error);
+      let errorMsg = error?.message || 'Failed to parse statement with AI.';
+      if (errorMsg.includes('fetch failed')) {
+        errorMsg = 'Gemini API connection failed. Please check internet connection or GEMINI_API_KEY.';
+      }
       return res.status(500).json({
-        error: error?.message || 'Failed to parse statement with AI.',
+        error: errorMsg,
       });
     }
   });
